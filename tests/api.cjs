@@ -15,7 +15,7 @@ Module._extensions['.ts'] = function (module, filename) {
   }).outputText, filename);
 };
 const originalFetch = global.fetch;
-const envNames = ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID'];
+const envNames = ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID', 'ELEVENLABS_MASCOT_VOICE_ID'];
 const originalEnv = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
 const json = value => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 const request = value => new Request('http://localhost/api', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
@@ -24,6 +24,14 @@ async function run() {
   for (const name of envNames) process.env[name] = 'test-placeholder';
   const { parseAnalysis } = require('../lib/analysis.ts');
   const { demoTranscripts, WARNING_SCRIPT } = require('../lib/demoTranscripts.ts');
+  const { scoreSignals, SIGNAL_THRESHOLD } = require('../lib/scamSignals.ts');
+  const { warningText } = require('../lib/warningText.ts');
+  for (const text of Object.values(demoTranscripts)) assert.ok(scoreSignals(text).score >= SIGNAL_THRESHOLD);
+  assert.equal(scoreSignals('Hi mom, dinner at six. See you then.').score, 0);
+  assert.equal(scoreSignals('gift cards gift cards gift cards').score, 35);
+  assert.equal(scoreSignals('arrested IRS').score, 40);
+  assert.ok(scoreSignals("don't tell your kids").score > 0);
+  assert.equal(scoreSignals('gift cardholder postcard').score, 0);
   const verdict = { risk_score: 95, level: 'scam', scam_type: 'irs', reasons: ['Gift cards are a warning sign.'], red_flags: [{ phrase: 'Apple gift cards', explanation: 'Gift cards are not a tax payment.' }] };
   assert.equal(parseAnalysis(JSON.stringify(verdict), demoTranscripts.irs).level, 'scam');
   for (const bad of ['null', '{}', 'not json', JSON.stringify({ ...verdict, level: 'safe' }), JSON.stringify({ ...verdict, risk_score: 101 }), JSON.stringify({ ...verdict, scam_type: 'invented' }), JSON.stringify({ ...verdict, red_flags: [{ phrase: 'invented quote', explanation: 'Bad' }] })])
@@ -59,7 +67,7 @@ async function run() {
   let speechCalls = 0;
   global.fetch = async (url, options) => {
     speechCalls++; assert.ok(url.includes('/text-to-speech/test-placeholder'));
-    assert.equal(JSON.parse(options.body).text, WARNING_SCRIPT);
+    assert.ok(JSON.parse(options.body).text === WARNING_SCRIPT || JSON.parse(options.body).text.startsWith("I'm CallCanary. This is a scam. Here's why."));
     assert.equal(JSON.parse(options.body).model_id, 'eleven_flash_v2_5');
     return new Response(new Uint8Array([73, 68, 51]), { headers: { 'Content-Type': 'audio/mpeg' } });
   };
@@ -67,6 +75,17 @@ async function run() {
   assert.equal((await speak(request({ text: 'arbitrary input' }))).status, 400);
   for (let i = 0; i < 2; i++) assert.equal((await speak(request({ text: WARNING_SCRIPT }))).headers.get('Content-Type'), 'audio/mpeg');
   assert.equal(speechCalls, 1);
+  const reasons = ['They demanded gift cards.', 'They threatened arrest.'];
+  for (let i = 0; i < 2; i++) assert.equal((await speak(request({ reasons }))).status, 200);
+  assert.equal(speechCalls, 2);
+  assert.equal((await speak(request({ reasons: ['A different scam explanation.'] }))).status, 200);
+  assert.equal(speechCalls, 3);
+  for (const reasons of [[], [null], [''], ['x'.repeat(501)], ['a', 'b', 'c', 'd']]) assert.equal((await speak(request({ reasons }))).status, 400);
+  assert.ok(warningText(['They demanded gift cards.']).includes('They demanded gift cards.'));
+  const health = require('../app/api/health/route.ts').GET;
+  const healthData = await (await health()).json();
+  assert.equal(healthData.analysis, false);
+  assert.equal(JSON.stringify(healthData).includes('test-placeholder'), false);
   const recordingRequest = (bytes = 4, type = 'audio/webm') => {
     const form = new FormData(); form.append('audio', new Blob([new Uint8Array(bytes)], { type }), 'call.webm');
     return new Request('http://localhost/api', { method: 'POST', body: form });
@@ -87,7 +106,10 @@ async function run() {
     assert.equal(options.body.get('model_id'), 'scribe_v2'); return json({ text: 'recovered' });
   };
   assert.equal((await (await transcribe(recordingRequest())).json()).transcript, 'recovered');
-  console.log('PASS: score boundaries, malformed verdicts, fabricated quotes, model discovery, analysis retry/fallback, speech cache, upload validation, transcription retry/model recovery.');
+  global.fetch = async () => json({ text: '' });
+  assert.equal((await (await transcribe(recordingRequest())).json()).transcript, '');
+  await require('./listening.cjs')();
+  console.log('PASS: weighted signals, score boundaries, malformed verdicts, model discovery, retries/fallbacks, contextual speech cache, upload/silence handling, continuous listening lifecycle and cleanup.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
   global.fetch = originalFetch; Module._load = originalLoad; Module._extensions['.ts'] = originalTs;

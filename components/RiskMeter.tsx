@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-export default function RiskMeter({ score }: { score: number | null }) {
+export default function RiskMeter({ score, label = "Call risk", signals = false }: { score: number | null; label?: string; signals?: boolean }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
     setDisplay(0);
@@ -13,12 +13,12 @@ export default function RiskMeter({ score }: { score: number | null }) {
     }, 30);
     return () => clearInterval(timer);
   }, [score]);
-  const color = display < 40 ? "#176b40" : display < 70 ? "#906000" : "#b91c24";
+  const color = display < (signals ? 35 : 40) ? "#176b40" : display < 70 ? "#906000" : "#b91c24";
   return <div className="risk-gauge" aria-label={score === null ? "Waiting for call analysis" : `Risk score ${score} out of 100`}>
-    <div className="gauge-heading"><span>CALL RISK</span><strong style={{ color }}>{score === null ? "—" : display}<small>/100</small></strong></div>
-    <div className="gauge-track" role={score === null ? undefined : "meter"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score ?? undefined} aria-label="Call risk">
+    <div className="gauge-heading"><span>{label.toUpperCase()}</span><strong style={{ color }}>{score === null ? "—" : display}<small>/100</small></strong></div>
+    <div className="gauge-track" role={score === null ? undefined : "meter"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score ?? undefined} aria-label={label}>
       {score !== null && <span style={{ width: `${display}%`, background: color }} />}
     </div>
-    <div className="gauge-labels"><span>Safe</span><span>Caution</span><span>Scam</span></div>
+    <div className="gauge-labels"><span>{signals ? "Few signals" : "Safe"}</span><span>{signals ? "Review" : "Caution"}</span><span>{signals ? "Many signals" : "Scam"}</span></div>
   </div>;
 }

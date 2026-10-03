@@ -166,3 +166,44 @@ button:disabled { opacity: .6; cursor: wait; }
 @keyframes listen-pulse { 50% { box-shadow: 0 0 0 15px #f4cf4740; } }
 @media (max-width: 620px) { .privacy-note { display: none; } .flag-list li { font-size: 21px; } .takeover-action { font-size: 22px; } .phone-copy h2 { font-size: 26px; } }
 @media (prefers-reduced-motion: reduce) { .listening .shield-ring { animation: none; } }
+/* Continuous protection and the masked canary mascot. */
+.monitor-content { max-width: 900px; }
+.monitor-card { width: min(100%, 600px); padding: 24px 32px 28px; border: 2px solid #d8cfac; border-radius: 28px; background: #fffdf5; box-shadow: 0 18px 45px #192e2215; display: flex; flex-direction: column; align-items: center; }
+.monitor-active { border-color: #22794a; box-shadow: 0 0 0 5px #22794a15; }
+.monitor-status { display: flex; gap: 10px; align-items: center; align-self: flex-start; color: #46544c; letter-spacing: .1em; font-size: 14px; font-weight: 800; }
+.live-dot, .off-dot { width: 12px; height: 12px; border-radius: 50%; background: #737970; }
+.live-dot { background: #217747; box-shadow: 0 0 0 5px #21774715; animation: listen-pulse 2s infinite; }
+.mascot { position: relative; width: 240px; height: 250px; margin: 14px auto 0; flex-shrink: 0; }
+.mascot img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 95%; }
+.mascot-shadow { display: block; width: 55%; height: 12px; position: absolute; bottom: 5px; left: 22%; border-radius: 50%; background: #17261f15; filter: blur(4px); }
+.mascot-bubble { width: 100%; text-align: center; }
+.mascot-bubble h2 { font-size: 29px; font-weight: 800; margin: 12px 0 8px; }
+.mascot-bubble p { font-size: 21px; line-height: 1.5; color: #46544c; margin: 0; }
+.monitor-card .risk-gauge { max-width: none; padding: 16px 0; }
+.trigger-note { font-size: 17px; line-height: 1.5; margin: -7px 0 12px; color: #5c573f; }
+.signal-list { margin: 0 0 12px; padding: 0; list-style: none; width: 100%; }
+.signal-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; margin: 8px 0; background: #fff0b4; border-radius: 12px; font-size: 21px; }
+.signal-list small { display: block; font-size: 17px; margin-top: 4px; color: #68551b; }
+.signal-list strong { font-size: 26px; color: #806016; }
+.consent-note { display: flex; gap: 12px; font-size: 16px; line-height: 1.5; color: #46544c; margin-top: 8px; cursor: pointer; }
+.consent-note input { width: 24px; height: 24px; flex-shrink: 0; margin-top: 3px; accent-color: #176b40; }
+.monitor-actions { width: 100%; display: grid; gap: 8px; }
+.monitor-actions .hangup-button, .monitor-actions .again-button { margin-top: 10px; }
+.monitor-limit, .listening-duration { font-size: 16px; text-align: center; line-height: 1.5; color: #46544c; margin: 18px 0 0; }
+.connection-pill { border-radius: 100px; padding: 8px 14px; color: #71551c; background: #fff1bc; font-size: 15px; font-weight: 700; }
+.connection-pill.connected { background: #e1efdf; color: #176b40; }
+.setup-card { max-width: 600px; width: 100%; padding: 18px 22px; margin-bottom: 20px; border: 1px solid #dcc564; border-radius: 14px; background: #fff6cf; font-size: 17px; line-height: 1.6; }
+.setup-card summary { cursor: pointer; font-weight: 800; font-size: 20px; }
+.setup-card ul { padding-left: 24px; }
+.setup-card code { overflow-wrap: anywhere; font-size: 14px; }
+.setup-card a { text-decoration: underline; font-weight: 700; }
+.takeover .mascot { width: 220px; height: 230px; margin-top: 0; }
+.mascot-alert { animation: mascot-enter .5s cubic-bezier(.2,.8,.3,1.1); }
+.mascot-speaking img { animation: mascot-talk .4s ease-in-out infinite alternate; }
+.warning-paused { font-size: 17px; margin: 14px 0 0; color: #fff1d8; }
+.voice-fallback { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.voice-fallback .new-check { margin-top: 6px; }
+@keyframes mascot-talk { from { transform: rotate(-2deg) translateY(0); } to { transform: rotate(2deg) translateY(-5px) scale(1.025); } }
+@keyframes mascot-enter { from { opacity: 0; transform: translateY(70px) scale(.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 620px) { .monitor-card { padding: 20px; } .mascot { width: 200px; height: 210px; } .connection-pill { font-size: 12px; padding: 7px 10px; } .intro-copy h1 { font-size: 35px; } }
+@media (prefers-reduced-motion: reduce) { .mascot-alert, .mascot-speaking img, .live-dot { animation: none; } }

@@ -1,0 +1,11 @@
+# CallCanary mascot
+
+Asset: `public/mascot.png`. Generated using the built-in image-generation tool with the user's masked yellow canary image as the edit target. Transparent PNG; no notebook-paper background. The alert animates the whole character when audio playback starts and stops. It does not provide phoneme-level lip sync.
+
+Prompt used:
+
+> Edit the attached image into a clean transparent-background website mascot cutout. Preserve the exact character identity: round golden-yellow canary, black knitted balaclava with rectangular yellow eye opening, stern small black eyes and orange beak, raised yellow wings and tiny black feet. Preserve hand-drawn bold dark outlines, original proportions, expression and pose. Remove ALL lined notebook paper and background. Clean edges, retain charming illustration texture. Single full-body character centered with transparent space around feet and wings, no text, no props, no redesign. Asset for CallCanary scam warning popup.
+
+An image does not contain a voice sample. The app uses the configured ElevenLabs voice ID. Set `ELEVENLABS_MASCOT_VOICE_ID` to give this character a distinct voice; otherwise it uses `ELEVENLABS_VOICE_ID`. Recommended direction for selecting or designing a character voice: clear English, slightly raspy protective little-bird personality, warm and firm, measured pace, easy for an older listener to understand. Voice design or cloning has not been performed.
+
+The speech route reads the current verdict's reasons, not a canned explanation from another scam. If ElevenLabs is unavailable, the user can choose the labeled device-voice backup.

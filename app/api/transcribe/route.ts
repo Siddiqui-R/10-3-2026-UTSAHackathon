@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       });
       if (response.ok) {
         const data = await response.json();
-        return typeof data.text === "string" && data.text.trim() ? NextResponse.json({ transcript: data.text }) : failure();
+        return typeof data.text === "string" ? NextResponse.json({ transcript: data.text }) : failure();
       }
       if (response.status >= 500 && !retried) { retried = true; continue; }
       if ([400, 404, 422].includes(response.status) && !discovered) {
