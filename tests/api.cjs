@@ -28,8 +28,6 @@ async function run() {
   const { warningText } = require('../lib/warningText.ts');
   for (const text of Object.values(demoTranscripts)) assert.ok(scoreSignals(text).score >= SIGNAL_THRESHOLD);
   assert.equal(scoreSignals('Hi mom, dinner at six. See you then.').score, 0);
-  assert.equal(scoreSignals('gift cards gift cards gift cards').score, 35);
-  assert.equal(scoreSignals('arrested IRS').score, 40);
   assert.ok(scoreSignals("don't tell your kids").score > 0);
   assert.equal(scoreSignals('gift cardholder postcard').score, 0);
   const verdict = { risk_score: 95, level: 'scam', scam_type: 'irs', reasons: ['Gift cards are a warning sign.'], red_flags: [{ phrase: 'Apple gift cards', explanation: 'Gift cards are not a tax payment.' }] };
@@ -74,7 +72,7 @@ async function run() {
   let speechCalls = 0;
   global.fetch = async (url, options) => {
     speechCalls++; assert.ok(url.includes('/text-to-speech/test-placeholder'));
-    assert.ok(JSON.parse(options.body).text === WARNING_SCRIPT || JSON.parse(options.body).text.startsWith("I'm CallCanary. This is a scam. Here's why."));
+    assert.ok(JSON.parse(options.body).text === WARNING_SCRIPT || /^(?:Hold on. It's CallCanary.|It's CallCanary.)/.test(JSON.parse(options.body).text));
     assert.equal(JSON.parse(options.body).model_id, 'eleven_flash_v2_5');
     return new Response(new Uint8Array([73, 68, 51]), { headers: { 'Content-Type': 'audio/mpeg' } });
   };
@@ -88,6 +86,17 @@ async function run() {
   assert.equal((await speak(request({ reasons: ['A different scam explanation.'] }))).status, 200);
   assert.equal(speechCalls, 3);
   for (const reasons of [[], [null], [''], ['x'.repeat(501)], ['a', 'b', 'c', 'd']]) assert.equal((await speak(request({ reasons }))).status, 400);
+  assert.equal((await speak(request({ reasons, level: 'invented' }))).status, 400);
+  // The spoken words follow the verdict level and its own reasons.
+  const spoken = async body => decodeURIComponent((await speak(request(body))).headers.get('X-Spoken-Text'));
+  assert.match(await spoken({ level: 'scam', reasons }), /I'm sure this call is a scam. They demanded gift cards. They threatened arrest./);
+  assert.match(await spoken({ level: 'suspicious', reasons: ['They pushed you to hurry.'] }), /doesn't sit right. They pushed you to hurry./);
+  assert.match(await spoken({ level: 'safe', reasons: ['Ordinary family chat.'] }), /sounded okay. Ordinary family chat./);
+  assert.doesNotMatch(await spoken({ level: 'safe', reasons: ['Ordinary family chat.'] }), /scam/);
+  // Explanations stay brief: one sentence per reason, long reasons clipped.
+  assert.ok(warningText(['First sentence is the key point here. Second sentence adds far too much detail.'], 'scam').includes('key point here.'));
+  assert.ok(!warningText(['First sentence is the key point here. Second sentence adds far too much detail.'], 'scam').includes('Second sentence'));
+  assert.ok(warningText(['word '.repeat(80)], 'scam').length < 400);
   assert.ok(warningText(['They demanded gift cards.']).includes('They demanded gift cards.'));
   const health = require('../app/api/health/route.ts').GET;
   const healthData = await (await health()).json();
@@ -115,6 +124,7 @@ async function run() {
   assert.equal((await (await transcribe(recordingRequest())).json()).transcript, 'recovered');
   global.fetch = async () => json({ text: '' });
   assert.equal((await (await transcribe(recordingRequest())).json()).transcript, '');
+  require('./scoring.cjs')();
   await require('./listening.cjs')();
   console.log('PASS: weighted signals, score boundaries, malformed verdicts, model discovery, retries/fallbacks, contextual speech cache, upload/silence handling, continuous listening lifecycle and cleanup.');
 }

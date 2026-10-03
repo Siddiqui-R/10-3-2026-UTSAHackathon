@@ -198,12 +198,44 @@ button:disabled { opacity: .6; cursor: wait; }
 .setup-card code { overflow-wrap: anywhere; font-size: 14px; }
 .setup-card a { text-decoration: underline; font-weight: 700; }
 .takeover .mascot { width: 220px; height: 230px; margin-top: 0; }
-.mascot-alert { animation: mascot-enter .5s cubic-bezier(.2,.8,.3,1.1); }
+/* Mascot moods. Each mood also has a static cue (badge, ring, tilt) that survives reduced motion. */
+.mascot-sleeping img { animation: mascot-breathe 4.5s ease-in-out infinite; filter: saturate(.85); }
+.mascot-alert img { animation: mascot-perk 3.2s ease-in-out infinite; }
+.mascot-ears { position: absolute; inset: 8% 4% 12%; border-radius: 50%; border: 4px solid #21774740; animation: mascot-listen 2.4s ease-out infinite; }
+.mascot-concerned img { transform: rotate(-6deg); animation: mascot-ponder 1.6s ease-in-out infinite; }
+.mascot-warning { animation: mascot-enter .5s cubic-bezier(.2,.8,.3,1.1); }
+.mascot-speaking { animation: mascot-enter .5s cubic-bezier(.2,.8,.3,1.1); }
 .mascot-speaking img { animation: mascot-talk .4s ease-in-out infinite alternate; }
+.mascot-badge { position: absolute; z-index: 2; top: 2%; right: 6%; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font: 800 32px/1 'Manrope', sans-serif; border: 3px solid #fff; box-shadow: 0 4px 12px #0003; }
+.mascot-badge-concerned { background: #f4b400; color: #3b2a00; }
+.mascot-badge-warning { background: #bd1e24; color: #fff; }
+@keyframes mascot-breathe { 50% { transform: scale(1.02, .985); } }
+@keyframes mascot-perk { 0%, 70%, 100% { transform: rotate(0); } 78% { transform: rotate(-4deg); } 88% { transform: rotate(3deg); } }
+@keyframes mascot-listen { from { transform: scale(.85); opacity: .9; } to { transform: scale(1.12); opacity: 0; } }
+@keyframes mascot-ponder { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(4deg) translateY(-3px); } }
 .warning-paused { font-size: 17px; margin: 14px 0 0; color: #fff1d8; }
 .voice-fallback { display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .voice-fallback .new-check { margin-top: 6px; }
 @keyframes mascot-talk { from { transform: rotate(-2deg) translateY(0); } to { transform: rotate(2deg) translateY(-5px) scale(1.025); } }
 @keyframes mascot-enter { from { opacity: 0; transform: translateY(70px) scale(.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (max-width: 620px) { .monitor-card { padding: 20px; } .mascot { width: 200px; height: 210px; } .connection-pill { font-size: 12px; padding: 7px 10px; } .intro-copy h1 { font-size: 35px; } }
-@media (prefers-reduced-motion: reduce) { .mascot-alert, .mascot-speaking img, .live-dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mascot, .mascot img, .mascot-ears, .live-dot { animation: none !important; }
+  .mascot-ears { transform: none; opacity: 1; }
+}
+/* Degraded-but-running protection and honest safety actions. */
+.protection-warning { width: 100%; display: flex; gap: 12px; align-items: flex-start; margin: 12px 0 4px; padding: 14px 16px; border: 2px solid #b26a00; border-radius: 14px; background: #fff3d6; color: #4a2c00; font-size: 19px; line-height: 1.5; font-weight: 600; }
+.protection-stopped { width: min(100%, 600px); margin-top: 16px; display: flex; gap: 14px; align-items: center; padding: 18px 20px; border-radius: 16px; background: #3a1214; color: #fff; font-size: 22px; font-weight: 800; line-height: 1.4; }
+.protection-stopped button { margin-left: auto; flex-shrink: 0; padding: 12px 18px; border-radius: 12px; border: 0; background: #fff; color: #3a1214; font-weight: 800; font-size: 19px; cursor: pointer; }
+.hear-why { margin-top: 12px; display: inline-flex; gap: 10px; align-items: center; padding: 14px 20px; border-radius: 14px; border: 2px solid currentColor; background: transparent; font-size: 20px; font-weight: 800; cursor: pointer; color: inherit; }
+.steps-card { margin-top: 16px; text-align: left; padding: 20px 22px; border-radius: 18px; background: #fff; color: var(--ink); }
+.steps-card h3 { margin: 0 0 10px; font-size: 24px; }
+.steps-card ol { margin: 0; padding-left: 26px; font-size: 21px; line-height: 1.6; }
+.steps-card p { font-size: 18px; line-height: 1.5; margin: 12px 0 0; color: #3f4a44; }
+.steps-card a { color: #0b4229; font-weight: 800; text-decoration: underline; }
+.contact-form { display: grid; gap: 10px; margin-top: 12px; }
+.contact-form label { font-size: 19px; font-weight: 700; }
+.contact-form input { font-size: 22px; padding: 12px 14px; border: 2px solid #6b766f; border-radius: 12px; }
+.contact-links { display: grid; gap: 10px; margin-top: 12px; }
+.contact-links a, .contact-links button { display: flex; justify-content: center; gap: 10px; align-items: center; padding: 16px; border-radius: 14px; background: #145c3a; color: #fff; font-size: 21px; font-weight: 800; text-decoration: none; border: 0; cursor: pointer; }
+.contact-links .secondary { background: #e6f2e9; color: #0b4229; }
