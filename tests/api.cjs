@@ -58,6 +58,13 @@ async function run() {
   assert.equal((await analyze(request(null))).status, 400);
   assert.equal((await (await analyze(request({ transcript: demoTranscripts.irs }))).json()).level, 'scam');
   assert.equal(postCount, 2);
+  let fallbackCalls = 0;
+  global.fetch = async url => {
+    fallbackCalls++;
+    return url.includes('gemini-3-flash-preview') ? new Response('', { status: 503 }) : json({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] } }] });
+  };
+  assert.equal((await (await analyze(request({ transcript: demoTranscripts.irs }))).json()).level, 'scam');
+  assert.equal(fallbackCalls, 2);
   global.fetch = async () => json({ candidates: [] });
   assert.equal((await (await analyze(request({ transcript: demoTranscripts.irs }))).json()).risk_score, 50);
   global.fetch = async () => { throw new Error('Provider offline'); };
