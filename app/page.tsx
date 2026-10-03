@@ -102,7 +102,7 @@ export default function Home() {
       </details>}
       <section className={`monitor-card ${active ? "monitor-active" : ""}`} aria-label="Continuous call protection">
         <div className="monitor-status"><span className={active ? "live-dot" : "off-dot"} />{demoBusy ? "CHECKING EXAMPLE" : session.state.status.toUpperCase()}</div>
-        <Mascot />
+        <Mascot sleeping={!active && !demoBusy} />
         <div className="mascot-bubble" aria-live="polite"><h2>{demoBusy ? "Those words sound concerning…" : active ? "I've got my ears on." : "Your call's tiny bodyguard."}</h2>
           <p>{demoBusy ? "Gemini is checking the full example." : session.state.message}</p></div>
         <RiskMeter score={score} label="Warning-phrase score" signals />
