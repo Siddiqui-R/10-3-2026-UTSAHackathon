@@ -1,0 +1,95 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const Module = require('node:module');
+const ts = require('typescript');
+const root = path.resolve(__dirname, '..');
+const originalLoad = Module._load;
+const originalTs = Module._extensions['.ts'];
+Module._load = function (name, parent, isMain) {
+  return originalLoad.call(this, name.startsWith('@/') ? path.join(root, name.slice(2)) : name, parent, isMain);
+};
+Module._extensions['.ts'] = function (module, filename) {
+  module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+  }).outputText, filename);
+};
+const originalFetch = global.fetch;
+const envNames = ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID'];
+const originalEnv = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
+const json = value => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+const request = value => new Request('http://localhost/api', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
+const loadRoute = name => { const file = path.join(root, `app/api/${name}/route.ts`); delete require.cache[file]; return require(file).POST; };
+async function run() {
+  for (const name of envNames) process.env[name] = 'test-placeholder';
+  const { parseAnalysis } = require('../lib/analysis.ts');
+  const { demoTranscripts, WARNING_SCRIPT } = require('../lib/demoTranscripts.ts');
+  const verdict = { risk_score: 95, level: 'scam', scam_type: 'irs', reasons: ['Gift cards are a warning sign.'], red_flags: [{ phrase: 'Apple gift cards', explanation: 'Gift cards are not a tax payment.' }] };
+  assert.equal(parseAnalysis(JSON.stringify(verdict), demoTranscripts.irs).level, 'scam');
+  for (const bad of ['null', '{}', 'not json', JSON.stringify({ ...verdict, level: 'safe' }), JSON.stringify({ ...verdict, risk_score: 101 }), JSON.stringify({ ...verdict, scam_type: 'invented' }), JSON.stringify({ ...verdict, red_flags: [{ phrase: 'invented quote', explanation: 'Bad' }] })])
+    assert.equal(parseAnalysis(bad, demoTranscripts.irs), null);
+  for (const score of [0, 39, 40, 69, 70, 100]) {
+    const level = score < 40 ? 'safe' : score < 70 ? 'suspicious' : 'scam';
+    assert.equal(parseAnalysis(JSON.stringify({ ...verdict, risk_score: score, level }), demoTranscripts.irs).level, level);
+  }
+  let postCount = 0;
+  global.fetch = async (url, options) => {
+    if (url.endsWith('/models')) return json({ models: [
+      { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3-flash-preview', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-4-flash-image', supportedGenerationMethods: ['generateContent'] },
+    ] });
+    assert.ok(url.includes('/models/gemini-3-flash-preview:generateContent'));
+    const body = JSON.parse(options.body);
+    assert.ok(body.generationConfig.responseSchema);
+    postCount++;
+    return json({ candidates: [{ content: { parts: [{ text: postCount === 1 ? 'broken' : JSON.stringify(verdict) }] } }] });
+  };
+  const analyze = loadRoute('analyze');
+  assert.equal((await analyze(request({ transcript: '' }))).status, 400);
+  assert.equal((await analyze(request(null))).status, 400);
+  assert.equal((await (await analyze(request({ transcript: demoTranscripts.irs }))).json()).level, 'scam');
+  assert.equal(postCount, 2);
+  global.fetch = async () => json({ candidates: [] });
+  assert.equal((await (await analyze(request({ transcript: demoTranscripts.irs }))).json()).risk_score, 50);
+  global.fetch = async () => { throw new Error('Provider offline'); };
+  assert.equal((await (await analyze(request({ transcript: 'Hi, family.' }))).json()).level, 'suspicious');
+  delete process.env.GEMINI_API_KEY;
+  assert.equal((await analyze(request({ transcript: 'Hello' }))).status, 503);
+  let speechCalls = 0;
+  global.fetch = async (url, options) => {
+    speechCalls++; assert.ok(url.includes('/text-to-speech/test-placeholder'));
+    assert.equal(JSON.parse(options.body).text, WARNING_SCRIPT);
+    assert.equal(JSON.parse(options.body).model_id, 'eleven_flash_v2_5');
+    return new Response(new Uint8Array([73, 68, 51]), { headers: { 'Content-Type': 'audio/mpeg' } });
+  };
+  const speak = loadRoute('speak');
+  assert.equal((await speak(request({ text: 'arbitrary input' }))).status, 400);
+  for (let i = 0; i < 2; i++) assert.equal((await speak(request({ text: WARNING_SCRIPT }))).headers.get('Content-Type'), 'audio/mpeg');
+  assert.equal(speechCalls, 1);
+  const recordingRequest = (bytes = 4, type = 'audio/webm') => {
+    const form = new FormData(); form.append('audio', new Blob([new Uint8Array(bytes)], { type }), 'call.webm');
+    return new Request('http://localhost/api', { method: 'POST', body: form });
+  };
+  const transcribe = loadRoute('transcribe');
+  assert.equal((await transcribe(recordingRequest(0))).status, 400);
+  assert.equal((await transcribe(recordingRequest(4, 'text/plain'))).status, 415);
+  assert.equal((await transcribe(recordingRequest(4 * 1024 * 1024 + 1))).status, 413);
+  let sttCalls = 0;
+  global.fetch = async () => ++sttCalls === 1 ? new Response('', { status: 503 }) : json({ text: 'hello' });
+  assert.equal((await (await transcribe(recordingRequest())).json()).transcript, 'hello');
+  assert.equal(sttCalls, 2);
+  sttCalls = 0;
+  global.fetch = async (url, options) => {
+    if (url.endsWith('/models')) return json([{ model_id: 'scribe_v2' }]);
+    sttCalls++;
+    if (sttCalls === 1) return new Response('invalid model_id scribe_v1', { status: 422 });
+    assert.equal(options.body.get('model_id'), 'scribe_v2'); return json({ text: 'recovered' });
+  };
+  assert.equal((await (await transcribe(recordingRequest())).json()).transcript, 'recovered');
+  console.log('PASS: score boundaries, malformed verdicts, fabricated quotes, model discovery, analysis retry/fallback, speech cache, upload validation, transcription retry/model recovery.');
+}
+run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
+  global.fetch = originalFetch; Module._load = originalLoad; Module._extensions['.ts'] = originalTs;
+  for (const name of envNames) { if (originalEnv[name] === undefined) delete process.env[name]; else process.env[name] = originalEnv[name]; }
+});

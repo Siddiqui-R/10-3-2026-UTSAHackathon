@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+build/
+coverage/
+.vercel/
+.env*
+!.env.example
+tiger-cloud-db-63048-credentials.txt
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
