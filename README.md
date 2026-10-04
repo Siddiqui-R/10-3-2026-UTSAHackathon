@@ -38,9 +38,12 @@ For calls from unknown numbers. Answer on speaker and tap **Answer with CallCana
 1. **Reported-number list:** the caller's number, if entered, is looked up in FTC Do Not Call complaint reports. A match decides the result ("Reported scam number"). Reported isn't proof, and caller ID can be faked; the page says so.
 2. **What the caller said:** ElevenLabs transcription. Silence is a warning sign, not a verdict.
 3. **Warning phrases:** the same weighted phrases as call listening. Context only; never decides alone.
-4. **CallCanary's judgment:** Gemini judges the content (likely scam / unclear / real caller) and extracts the stated name and reason. The transcript is treated as untrusted data.
+4. **Trusted contacts:** family saved on this device (name + number). If the caller gives a saved name (fuzzy, so a misheard "Jack" still matches "Jake") from a different number, the result is "Is it really Jake?" with his saved number to call back. Contacts are compared for that one check; they are never stored on the server or sent to the AI.
+5. **CallCanary's judgment:** Gemini judges the content (likely scam / unclear / real caller) and extracts the stated name and reason. The transcript is treated as untrusted data.
 
-The result shows every layer and marks the one that **decided**. Without Gemini the result is never "safe". For scams, **Have CallCanary say goodbye** tells the caller the person isn't available. The number check also works on its own.
+Each layer appears as soon as it finishes (the server streams progress), so the caller's words show before the final verdict. The result shows every layer and marks the one that **decided**. Without Gemini the result is never "safe". For scams, **Have CallCanary say goodbye** tells the caller the person isn't available. The number check also works on its own.
+
+**Try a sample call** plays one of four recorded callers (an IRS scammer, grandson Jake, someone claiming to be Jake from a new number, and a caller from an FTC-reported number) through the same real checks, with a sample contact. No microphone needed. Re-record them with `node scripts/make-screen-demos.mjs`.
 
 The FTC list ships with the app as `data/ftc-reported-numbers.tsv.gz` (about 196,000 numbers, 1.1 MB, binary-searched in memory), so there's no database to keep running. Refresh it with `node scripts/build-ftc-index.mjs 30` and redeploy. The page shows the dates it covers.
 

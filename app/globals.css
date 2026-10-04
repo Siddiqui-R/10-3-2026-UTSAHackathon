@@ -411,3 +411,21 @@ button:disabled { opacity: .6; cursor: wait; }
   .tabs { display: grid; grid-template-columns: 1fr 1fr; }
   .tab { max-width: none; }
 }
+/* Screen a caller: contacts, sample calls, live progress. */
+.contacts-card { margin-top: 18px; }
+.contacts-card summary { display: flex; align-items: center; gap: 10px; font: 800 24px/1.3 'Manrope', sans-serif; cursor: pointer; }
+.contact-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.contact-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 2px solid #e2e8e3; font-size: 21px; }
+.contact-list small { display: block; font-size: 18px; color: #46544c; }
+.contact-list button { min-width: 52px; min-height: 52px; border-radius: 12px; border: 2px solid #b3141b; background: #fff; color: #8a1016; cursor: pointer; display: grid; place-items: center; }
+.contacts-card .contact-form input { font-size: 22px; padding: 12px 14px; border: 2px solid #5d6b62; border-radius: 12px; }
+.screen-demos { width: 100%; margin-top: 18px; }
+.screen-demos .demo-buttons { display: grid; gap: 10px; }
+.screen-demos .demo-buttons button { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; text-align: left; }
+.screen-demos .demo-buttons small { flex-basis: 100%; font-size: 17px; font-weight: 600; color: #46544c; }
+.demo-tag { align-self: center; margin: 0; padding: 6px 14px; border-radius: 99px; background: #17261f; color: #fff; font-size: 17px; font-weight: 700; text-align: center; }
+.screen-live .layer-list { width: 100%; text-align: left; }
+.layer-pending { opacity: .75; border-style: dashed !important; }
+.layer-pending .layer-icon { animation: layer-wait 1.2s ease-in-out infinite; }
+@keyframes layer-wait { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .layer-pending .layer-icon { animation: none; } }

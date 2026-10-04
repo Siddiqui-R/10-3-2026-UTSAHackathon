@@ -1,12 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleSlash, Hash, PhoneIncoming, PhoneOff, RotateCcw, Square, Volume2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleSlash, Hash, PhoneIncoming, PhoneOff, Play, RotateCcw, Square, Trash2, UserPlus, Users, Volume2 } from "lucide-react";
 import TopBar from "@/components/TopBar";
 import Mascot, { type MascotMood } from "@/components/Mascot";
 import SafetyActions from "@/components/SafetyActions";
 import type { NumberCheck } from "@/lib/reportedNumbers";
 import type { ScreenLayer, ScreenResult } from "@/lib/screening";
 import { SCREEN_GOODBYE, SCREEN_GREETING } from "@/lib/screening";
+import { runScreen, type ScreenProgress } from "@/lib/screenClient";
+import { sanitizeContacts, type TrustedContact } from "@/lib/contacts";
+import { loadContacts, saveContacts } from "@/lib/contactStore";
+import { formatUsNumber, normalizeUsNumber } from "@/lib/phoneNumber";
+import { DEMO_CONTACTS, SCREEN_DEMOS, type ScreenDemo } from "@/lib/screenDemos";
 import { speakWithDeviceVoice } from "@/lib/deviceVoice";
 
 type Stage = "idle" | "greeting" | "recording" | "checking" | "done";
@@ -19,20 +24,20 @@ const banner = {
   careful: { className: "verdict-careful", icon: "⚠️" },
   safe: { className: "verdict-safe", icon: "✅" },
 } as const;
-const layerIcon: Record<ScreenLayer["status"], string> = { flagged: "⛔", clear: "✅", skipped: "—", unavailable: "…" };
+const layerIcon: Record<ScreenLayer["status"], string> = { flagged: "⛔", clear: "✅", info: "ℹ️", skipped: "—", unavailable: "…", pending: "⏳" };
 
 async function fetchVoice(script: "greeting" | "goodbye") {
   const response = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script }) });
   if (!response.ok) throw new Error("voice unavailable");
   return URL.createObjectURL(await response.blob());
 }
-/** Play the canary's line; falls back to the device voice. Resolves when it finishes. */
-function playLine(url: string | undefined, text: string) {
+/** Play a recording; falls back to the device voice reading `text`. Resolves when it finishes. */
+function playAudio(url: string | undefined, text: string, onPlayer?: (audio: HTMLAudioElement) => void) {
   return new Promise<void>(resolve => {
     const viaDevice = () => { if (!speakWithDeviceVoice(text, { onStart: () => {}, onEnd: () => resolve(), onError: () => resolve() })) resolve(); };
     if (!url) { viaDevice(); return; }
-    const audio = new Audio(url);
-    audio.onended = () => resolve(); audio.onerror = viaDevice;
+    const audio = new Audio(url); onPlayer?.(audio);
+    audio.onended = () => resolve(); audio.onerror = viaDevice; audio.onpause = () => { if (!audio.ended) resolve(); };
     audio.play().catch(viaDevice);
   });
 }
@@ -43,17 +48,23 @@ export default function ScreenCaller() {
   const [lookup, setLookup] = useState<(NumberCheck & { error?: string }) | null>(null);
   const [looking, setLooking] = useState(false);
   const [result, setResult] = useState<ScreenResult | null>(null);
+  const [progress, setProgress] = useState<ScreenProgress | null>(null);
   const [error, setError] = useState("");
   const [heard, setHeard] = useState(false);
   const [goodbye, setGoodbye] = useState<"idle" | "playing" | "done">("idle");
+  const [contacts, setContacts] = useState<TrustedContact[]>([]);
+  const [demo, setDemo] = useState<ScreenDemo | null>(null);
   const greetingUrl = useRef<string>();
   const cancel = useRef<() => void>(() => {});
+  const stopRecording = useRef<() => void>(() => {});
   // Prepare the greeting early so it plays right after the tap (browsers block late autoplay).
   useEffect(() => {
     let alive = true;
+    setContacts(loadContacts());
     void fetchVoice("greeting").then(url => { if (alive) greetingUrl.current = url; else URL.revokeObjectURL(url); }).catch(() => {});
     return () => { alive = false; cancel.current(); if (greetingUrl.current) URL.revokeObjectURL(greetingUrl.current); };
   }, []);
+  function updateContacts(next: TrustedContact[]) { setContacts(next); saveContacts(next); }
 
   async function checkNumber() {
     setLooking(true); setLookup(null);
@@ -61,9 +72,20 @@ export default function ScreenCaller() {
     catch { setLookup({ status: "unavailable", number: phone, detail: "The check could not finish. Please try again." }); }
     finally { setLooking(false); }
   }
+  async function submit(audio: Blob, callerPhone: string, contactList: TrustedContact[], isCancelled: () => boolean) {
+    setStage("checking"); setProgress(null);
+    const form = new FormData();
+    form.append("audio", audio, audio.type.includes("mp4") ? "reply.mp4" : audio.type.includes("mpeg") ? "reply.mp3" : "reply.webm");
+    if (callerPhone.trim()) form.append("phone", callerPhone);
+    form.append("contacts", JSON.stringify(contactList));
+    try {
+      const final = await runScreen(form, update => { if (!isCancelled()) setProgress(update); });
+      if (!isCancelled()) { setResult(final); setStage("done"); }
+    } catch (cause) { if (!isCancelled()) { setError(cause instanceof Error ? cause.message : "The screen could not finish."); setStage("idle"); } }
+  }
 
   async function answer() {
-    setError(""); setResult(null); setHeard(false); setGoodbye("idle");
+    setError(""); setResult(null); setHeard(false); setGoodbye("idle"); setDemo(null);
     let stream: MediaStream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
     catch { setError("CallCanary needs the microphone to hear the caller. Allow microphone access and try again."); return; }
@@ -71,7 +93,7 @@ export default function ScreenCaller() {
     const release = () => { stream.getTracks().forEach(track => track.stop()); };
     cancel.current = () => { stopped = true; release(); window.speechSynthesis?.cancel(); };
     setStage("greeting");
-    await playLine(greetingUrl.current, SCREEN_GREETING);
+    await playAudio(greetingUrl.current, SCREEN_GREETING);
     if (stopped) return;
     // Record only after the greeting, so CallCanary never hears itself.
     setStage("recording");
@@ -98,32 +120,39 @@ export default function ScreenCaller() {
     stopRecording.current = finish;
     await finished; release(); void context.close();
     if (stopped) return;
-    setStage("checking");
-    const form = new FormData();
-    const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-    form.append("audio", blob, blob.type.includes("mp4") ? "reply.mp4" : "reply.webm");
-    if (phone.trim()) form.append("phone", phone);
-    try {
-      const response = await fetch("/api/screen", { method: "POST", body: form });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "The screen could not finish.");
-      setResult(data); setStage("done");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "The screen could not finish."); setStage("idle"); }
+    await submit(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }), phone, contacts, () => stopped);
   }
-  const stopRecording = useRef<() => void>(() => {});
+
+  // A sample call: the greeting, then the recorded caller out loud, then the same checks as a real call.
+  async function runDemo(sample: ScreenDemo) {
+    setError(""); setResult(null); setGoodbye("idle"); setDemo(sample); setPhone(sample.phone); setLookup(null);
+    let stopped = false; let player: HTMLAudioElement | undefined;
+    cancel.current = () => { stopped = true; player?.pause(); window.speechSynthesis?.cancel(); };
+    setStage("greeting");
+    await playAudio(greetingUrl.current, SCREEN_GREETING, audio => { player = audio; });
+    if (stopped) return;
+    setStage("recording"); setHeard(true);
+    await playAudio(sample.audio, sample.text, audio => { player = audio; });
+    if (stopped) return;
+    let audio: Blob;
+    try { audio = await (await fetch(sample.audio)).blob(); }
+    catch { setError("The sample call couldn't be loaded."); setStage("idle"); return; }
+    await submit(new Blob([audio], { type: "audio/mpeg" }), sample.phone, DEMO_CONTACTS, () => stopped);
+  }
 
   async function sayGoodbye() {
     setGoodbye("playing");
     let url: string | undefined;
     try { url = await fetchVoice("goodbye"); } catch { url = undefined; }
-    await playLine(url, SCREEN_GOODBYE);
+    await playAudio(url, SCREEN_GOODBYE);
     if (url) URL.revokeObjectURL(url);
     setGoodbye("done");
   }
-  function reset() { cancel.current(); setStage("idle"); setResult(null); setError(""); setGoodbye("idle"); }
+  function reset() { cancel.current(); setStage("idle"); setResult(null); setProgress(null); setError(""); setGoodbye("idle"); setDemo(null); }
 
   const mood: MascotMood = stage === "greeting" ? "speaking" : stage === "recording" ? "alert" : stage === "checking" ? "concerned"
     : result?.verdict === "scam" ? "warning" : result?.verdict === "careful" ? "concerned" : stage === "done" ? "alert" : "sleeping";
+  const busy = stage === "greeting" || stage === "recording" || stage === "checking";
   return <main className="app-shell">
     <TopBar active="screen" />
     <section className="home-content email-content">
@@ -145,22 +174,64 @@ export default function ScreenCaller() {
             <li>CallCanary greets the caller and listens to their answer.</li></ol>
         </div>
         <button className="answer-button" onClick={() => void answer()}><PhoneIncoming size={30} />Answer with CallCanary</button>
-        <p className="form-hint">The caller&apos;s reply is sent to ElevenLabs to turn it into words and to Google&apos;s Gemini to judge it. Nothing is saved.</p>
+        <p className="form-hint">The caller&apos;s reply is sent to ElevenLabs to turn it into words and to Google&apos;s Gemini to judge it. Nothing is saved. Your contacts are only compared, never stored or sent to the AI.</p>
+        <ContactsCard contacts={contacts} onChange={updateContacts} />
+        <details className="demo-panel screen-demos"><summary>Try a sample call</summary>
+          <p>Hear a recorded caller answer CallCanary, then watch the real checks run. Uses a sample contact “Jake” at (210) 555-0147.</p>
+          <div className="demo-buttons">{SCREEN_DEMOS.map(sample => <button key={sample.id} onClick={() => void runDemo(sample)}><Play size={20} aria-hidden="true" /> {sample.label}<small>{sample.phone}</small></button>)}</div>
+        </details>
       </>}
 
-      {(stage === "greeting" || stage === "recording" || stage === "checking") && <div className="screen-live" role="status" aria-live="polite">
+      {busy && <div className="screen-live" role="status" aria-live="polite">
+        {demo && <p className="demo-tag">Sample call: {demo.label} · {demo.phone}</p>}
         <Mascot mood={mood} />
         <h2>{stage === "greeting" ? "CallCanary is greeting the caller…" : stage === "recording" ? (heard ? "Listening to the caller…" : "Waiting for the caller to answer…") : "Checking what they said…"}</h2>
         {stage === "greeting" && <p className="lesson">“{SCREEN_GREETING}”</p>}
-        {stage === "recording" && <button className="big-action action-plain" onClick={() => stopRecording.current()}><Square size={24} />They&apos;re done talking</button>}
+        {stage === "recording" && demo && <p className="lesson">Caller: “{demo.text}”</p>}
+        {stage === "recording" && !demo && <button className="big-action action-plain" onClick={() => stopRecording.current()}><Square size={24} />They&apos;re done talking</button>}
+        {stage === "checking" && <LayerList layers={progress?.layers || []} decidedBy={null} />}
         <button className="big-action action-report" onClick={reset}>Cancel</button>
       </div>}
 
       {error && <div className="error-message" role="alert"><AlertTriangle size={24} /><p>{error}</p></div>}
 
-      {stage === "done" && result && <ScreenResultView result={result} mood={mood} goodbye={goodbye} onGoodbye={() => void sayGoodbye()} onReset={reset} />}
+      {stage === "done" && result && <ScreenResultView result={result} mood={mood} demo={demo} goodbye={goodbye} onGoodbye={() => void sayGoodbye()} onReset={reset} />}
     </section>
   </main>;
+}
+
+function ContactsCard({ contacts, onChange }: { contacts: TrustedContact[]; onChange: (next: TrustedContact[]) => void }) {
+  const [name, setName] = useState(""); const [number, setNumber] = useState(""); const [problem, setProblem] = useState("");
+  function add() {
+    const digits = normalizeUsNumber(number);
+    if (!name.trim()) { setProblem("Enter their name."); return; }
+    if (number.trim() && !digits) { setProblem("Enter a 10-digit US phone number, or leave it blank."); return; }
+    onChange(sanitizeContacts([...contacts, { name, phone: digits }])); setName(""); setNumber(""); setProblem("");
+  }
+  return <details className="check-card contacts-card">
+    <summary><Users size={24} aria-hidden="true" /> Trusted contacts ({contacts.length})</summary>
+    <p className="form-hint">If a caller says “It&apos;s Jake” from a number that isn&apos;t Jake&apos;s, CallCanary warns you. Saved only on this device.</p>
+    {contacts.length > 0 && <ul className="contact-list">{contacts.map((contact, i) => <li key={`${contact.name}-${i}`}>
+      <span><strong>{contact.name}</strong><small>{contact.phone ? formatUsNumber(contact.phone) : "No number saved"}</small></span>
+      <button aria-label={`Remove ${contact.name}`} onClick={() => onChange(contacts.filter((_, j) => j !== i))}><Trash2 size={22} /></button>
+    </li>)}</ul>}
+    <div className="contact-form">
+      <label htmlFor="contact-new-name">Name</label>
+      <input id="contact-new-name" value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Jake" autoComplete="off" />
+      <label htmlFor="contact-new-phone">Their phone number</label>
+      <input id="contact-new-phone" type="tel" inputMode="tel" value={number} onChange={event => setNumber(event.target.value)} placeholder="e.g. (210) 555-0147" autoComplete="off" />
+      {problem && <p className="lesson" role="alert">{problem}</p>}
+      <button className="big-action action-plain" onClick={add}><UserPlus size={24} />Add contact</button>
+    </div>
+  </details>;
+}
+
+function LayerList({ layers, decidedBy }: { layers: ScreenLayer[]; decidedBy: ScreenResult["decided_by"] | null }) {
+  if (!layers.length) return <p className="lesson">Starting the checks…</p>;
+  return <ul className="layer-list" aria-live="polite">{layers.map(layer => <li key={layer.id} className={`${layer.id === decidedBy ? "layer-decided" : ""} layer-${layer.status}`}>
+    <span className="layer-icon" aria-hidden="true">{layerIcon[layer.status]}</span>
+    <span><strong>{layer.label}</strong>{layer.id === decidedBy && <em className="decided-badge">Decided</em>}<small>{layer.detail}</small></span>
+  </li>)}</ul>;
 }
 
 function NumberResult({ lookup }: { lookup: NumberCheck & { error?: string } }) {
@@ -177,12 +248,13 @@ function NumberResult({ lookup }: { lookup: NumberCheck & { error?: string } }) 
   </div>;
 }
 
-function ScreenResultView({ result, mood, goodbye, onGoodbye, onReset }: { result: ScreenResult; mood: MascotMood; goodbye: "idle" | "playing" | "done"; onGoodbye: () => void; onReset: () => void }) {
+function ScreenResultView({ result, mood, demo, goodbye, onGoodbye, onReset }: { result: ScreenResult; mood: MascotMood; demo: ScreenDemo | null; goodbye: "idle" | "playing" | "done"; onGoodbye: () => void; onReset: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
   const look = banner[result.verdict];
   const analysis = { risk_score: 90, level: "scam" as const, scam_type: "other" as const, reasons: [result.explanation], red_flags: [] };
   return <section className="email-result" aria-labelledby="screen-verdict">
+    {demo && <p className="demo-tag">Sample call: {demo.label} · {demo.phone}</p>}
     <div className={`verdict-banner ${look.className}`}>
       <Mascot mood={mood} />
       <h2 id="screen-verdict" ref={heading} tabIndex={-1}><span aria-hidden="true">{look.icon} </span>{result.headline}</h2>
@@ -197,10 +269,7 @@ function ScreenResultView({ result, mood, goodbye, onGoodbye, onReset }: { resul
       <ul className="pressure-list">{result.red_flags.map((flag, i) => <li key={i}><AlertTriangle size={22} aria-hidden="true" />{flag}</li>)}</ul></div>}
     <div className="check-card">
       <h3>How CallCanary checked:</h3>
-      <ul className="layer-list">{result.layers.map(layer => <li key={layer.id} className={layer.id === result.decided_by ? "layer-decided" : ""}>
-        <span className="layer-icon" aria-hidden="true">{layerIcon[layer.status]}</span>
-        <span><strong>{layer.label}</strong>{layer.id === result.decided_by && <em className="decided-badge">Decided</em>}<small>{layer.detail}</small></span>
-      </li>)}</ul>
+      <LayerList layers={result.layers} decidedBy={result.decided_by} />
     </div>
     <div className="email-actions">
       {result.verdict === "safe" ? <div className="confirm-box" role="status"><p><CheckCircle2 size={22} aria-hidden="true" /> You can talk to them now.</p><p>Still: never send money or share codes on a call you didn&apos;t expect.</p></div> : <>

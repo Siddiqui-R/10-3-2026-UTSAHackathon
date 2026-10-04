@@ -55,12 +55,47 @@ module.exports = async function testScreen() {
   assert.equal(decideScreening({ number: null, transcript: '', judgment: null }).headline, "The caller didn't answer");
   assert.equal(decideScreening({ number: null, transcript: null, judgment: null }).verdict, 'careful');
 
+  // Trusted contacts: names the caller gives, fuzzy matching, and number comparison.
+  const { jaroWinkler, statedNames, matchContact, sanitizeContacts } = require('../lib/contacts.ts');
+  assert.ok(jaroWinkler('jake', 'jack') >= 0.86 && jaroWinkler('jake', 'jake') === 1 && jaroWinkler('jake', 'mary') < 0.6);
+  assert.deepEqual(statedNames("Hi Grandma, it's Jake! I'm just calling"), ['jake']);
+  assert.deepEqual(statedNames('This is Officer Daniels with the IRS.'), ['daniels']);
+  assert.deepEqual(statedNames("It's me, I'm in trouble, this is about your account"), []);
+  assert.deepEqual(statedNames('Sarah here, calling about dinner'), ['sarah']);
+  const saved = sanitizeContacts([{ name: 'Jake Miller', phone: '(210) 555-0147' }, { name: 'Sarah', phone: null }, { name: '', phone: '1' }, 'junk']);
+  assert.deepEqual(saved, [{ name: 'Jake Miller', phone: '2105550147' }, { name: 'Sarah', phone: null }]);
+  assert.equal(matchContact(['jack'], saved).contact.name, 'Jake Miller'); assert.equal(matchContact(['jack'], saved).exact, false);
+  assert.equal(matchContact(['jake'], saved).exact, true);
+  assert.equal(matchContact(['bob'], saved), null);
+  const notReported = checkReportedNumber('7375550199');
+  const familyJudgment = { verdict: 'legit', risk_score: 10, stated_name: 'Jake', stated_reason: 'Lunch on Saturday', explanation: 'Your grandson asking about lunch.', red_flags: [] };
+  const impostor = decideScreening({ number: notReported, transcript: "Hi Grandma, it's Jake. I got a new phone, this is my new number.", judgment: familyJudgment, contacts: saved });
+  assert.equal(impostor.verdict, 'careful'); assert.equal(impostor.decided_by, 'contacts'); assert.equal(impostor.headline, 'Is it really Jake Miller?');
+  assert.match(impostor.explanation, /call Jake Miller back at \(210\) 555-0147/);
+  const realJake = decideScreening({ number: checkReportedNumber('2105550147'), transcript: "Hi Grandma, it's Jake!", judgment: familyJudgment, contacts: saved });
+  assert.equal(realJake.verdict, 'safe'); assert.equal(realJake.headline, 'Sounds like Jake Miller');
+  assert.equal(decideScreening({ number: null, transcript: "It's Jake", judgment: familyJudgment, contacts: saved }).layers.find(l => l.id === 'contacts').status, 'info');
+  assert.equal(decideScreening({ number: null, transcript: "Sarah here", judgment: familyJudgment, contacts: saved }).layers.find(l => l.id === 'contacts').status, 'info');
+  assert.equal(decideScreening({ number: null, transcript: "Hi, it's Jake", judgment: familyJudgment }).layers.find(l => l.id === 'contacts').status, 'skipped');
+  // Without the AI, a mismatch still warns.
+  assert.equal(decideScreening({ number: notReported, transcript: "It's Jake, new number", judgment: null, contacts: saved }).decided_by, 'contacts');
+
+  // Sample calls: recordings exist and the "reported" sample is still on the shipped FTC list.
+  const { SCREEN_DEMOS, DEMO_CONTACTS } = require('../lib/screenDemos.ts');
+  for (const sample of SCREEN_DEMOS) assert.ok(fs.statSync(path.join(__dirname, '../public', sample.audio)).size > 5000, sample.id);
+  useIndexForTests(undefined);
+  assert.equal(checkReportedNumber(SCREEN_DEMOS.find(d => d.id === 'reported').phone).status, 'reported', 'refresh changed the list: pick a new reported sample number');
+  for (const id of ['scam', 'family', 'impostor']) assert.equal(checkReportedNumber(SCREEN_DEMOS.find(d => d.id === id).phone).status, 'not_reported', id);
+  assert.equal(normalizeUsNumber(SCREEN_DEMOS.find(d => d.id === 'family').phone), DEMO_CONTACTS[0].phone);
+  useIndexForTests(index);
+
   // Routes.
   const loadRoute = name => { const file = path.join(__dirname, `../app/api/${name}/route.ts`); delete require.cache[file]; return require(file); };
   const { GET } = loadRoute('check-number');
   assert.equal((await GET(new Request('http://localhost/api/check-number?phone=abc'))).status, 400);
   assert.equal((await (await GET(new Request('http://localhost/api/check-number?phone=210-555-0100'))).json()).status, 'reported');
   const { POST } = loadRoute('screen');
+  const events = async response => { assert.match(response.headers.get('content-type'), /ndjson/); return (await response.text()).trim().split(/\n/).map(line => JSON.parse(line)); };
   const screenRequest = (fields, bytes = 8) => { const form = new FormData(); if (bytes) form.append('audio', new Blob([new Uint8Array(bytes)], { type: 'audio/webm' }), 'reply.webm'); for (const [k, v] of Object.entries(fields)) form.append(k, v); return new Request('http://localhost/api/screen', { method: 'POST', body: form }); };
   assert.equal((await POST(screenRequest({}, 0))).status, 400);
   process.env.ELEVENLABS_API_KEY = 'test-placeholder'; process.env.GEMINI_API_KEY = 'test-placeholder';
@@ -73,14 +108,28 @@ module.exports = async function testScreen() {
     assert.ok(body.systemInstruction.parts[0].text.startsWith('You screen phone calls'));
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(scamJudgment) }] } }] }));
   };
-  const screened = await (await POST(screenRequest({ phone: '415-555-0100' }))).json();
+  const screenedEvents = await events(await POST(screenRequest({ phone: '415-555-0100' })));
+  const screened = screenedEvents.at(-1).result;
   assert.equal(screened.verdict, 'scam'); assert.equal(screened.decided_by, 'content'); assert.equal(screened.layers[0].status, 'clear');
   assert.ok(geminiPrompt.includes('untrusted data') && geminiPrompt.includes('Gift-card payment'));
-  const reportedCall = await (await POST(screenRequest({ phone: '2105550100' }))).json();
+  // Live progress: the number first, then the transcript, then the AI verdict.
+  assert.deepEqual(screenedEvents.map(e => e.type), ['progress', 'progress', 'result']);
+  assert.ok(screenedEvents[0].layers.filter(l => l.status === 'pending').map(l => l.id).join() === 'transcript,phrases,contacts,content');
+  assert.equal(screenedEvents[1].transcript, 'This is Officer Daniels from the IRS. Pay with Apple gift cards today.');
+  assert.deepEqual(screenedEvents[1].layers.filter(l => l.status === 'pending').map(l => l.id), ['contacts', 'content']);
+  // Contacts are compared but never sent to the AI.
+  geminiPrompt = '';
+  const withContacts = (await events(await POST(screenRequest({ phone: '415-555-0100', contacts: JSON.stringify([{ name: 'Daniels', phone: '(512) 555-0111' }, { name: 'Secret Aunt', phone: '6175550123' }]) })))).at(-1).result;
+  assert.ok(!geminiPrompt.includes('Secret Aunt') && !geminiPrompt.includes('6175550123') && !geminiPrompt.includes('5125550111'));
+  assert.equal(withContacts.layers.find(l => l.id === 'contacts').status, 'flagged');
+  assert.equal(withContacts.decided_by, 'content', 'a scam verdict from the content outranks a contact mismatch');
+  assert.equal(withContacts.red_flags[0], 'Claims to be Daniels from a different number');
+  assert.equal((await events(await POST(screenRequest({ contacts: 'not json' })))).at(-1).type, 'result');
+  const reportedCall =(await events(await POST(screenRequest({ phone: '2105550100' })))).at(-1).result;
   assert.equal(reportedCall.decided_by, 'number');
   // Providers down: still answers, never "safe".
   global.fetch = async () => { throw new Error('offline'); };
-  const offline = await (await POST(screenRequest({}))).json();
+  const offline = (await events(await POST(screenRequest({})))).at(-1).result;
   assert.equal(offline.verdict, 'careful'); assert.equal(offline.layers.find(l => l.id === 'transcript').status, 'unavailable');
   // The screening greeting uses the canary voice; arbitrary text is still refused.
   let spoken = '';

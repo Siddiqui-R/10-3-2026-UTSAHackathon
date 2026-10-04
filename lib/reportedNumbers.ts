@@ -11,13 +11,8 @@ export type NumberCheck =
   | { status: "not_reported"; number: string; from: string; to: string }
   | { status: "reported"; number: string; reports: number; robocall_reports: number; last_reported: string; topic: string; from: string; to: string };
 
-/** US numbers to 10 digits: "(210) 555-0100", "+1 210 555 0100" → "2105550100". */
-export function normalizeUsNumber(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  const digits = input.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
-  return /^[2-9]\d{2}[2-9]\d{6}$/.test(digits) ? digits : null;
-}
-export function formatUsNumber(digits: string) { return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`; }
+import { normalizeUsNumber } from "./phoneNumber";
+export { formatUsNumber, normalizeUsNumber } from "./phoneNumber";
 
 type Index = { from: string; to: string; subjects: string[]; phones: Float64Array; reports: Uint32Array; last: Uint32Array; robo: Uint32Array; topic: Uint16Array };
 let cached: Index | undefined;

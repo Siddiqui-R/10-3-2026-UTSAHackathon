@@ -1,15 +1,18 @@
+import { formatUsNumber } from "./phoneNumber";
 import type { NumberCheck } from "./reportedNumbers";
+import { matchContact, statedNames, type TrustedContact } from "./contacts";
 import { scoreSignals, SIGNAL_THRESHOLD } from "./scamSignals";
 
 // Caller screening: CallCanary answers first, the caller states their name and reason, and layered checks decide.
-//   1. Reported number   FTC complaint list match          -> "scam"   (stops here; content is still shown)
-//   2. Transcript        ElevenLabs                         not a verdict; feeds 3 and 4
-//   3. Warning phrases   code, same weights as listening     context only; never decides alone
-//   4. Gemini            judges what the caller said         -> "scam" | "careful" | "safe"
-// Only the number list or Gemini can decide. Without Gemini, the result is never "safe".
+//   1. Reported number   FTC complaint list match             -> "scam"    (decides first; content is still shown)
+//   2. Transcript        ElevenLabs                           not a verdict; feeds the layers below
+//   3. Warning phrases   code, same weights as listening      context only; never decides alone
+//   4. Trusted contacts  claims a saved name, other number    -> "careful" (unless the content is already a scam)
+//   5. Gemini            judges what the caller said          -> "scam" | "careful" | "safe"
+// Without Gemini, the result is never "safe".
 export type ScreenVerdict = "scam" | "careful" | "safe";
-export type LayerStatus = "flagged" | "clear" | "skipped" | "unavailable";
-export type ScreenLayer = { id: "number" | "transcript" | "phrases" | "content"; label: string; status: LayerStatus; detail: string };
+export type LayerStatus = "flagged" | "clear" | "info" | "skipped" | "unavailable" | "pending";
+export type ScreenLayer = { id: "number" | "transcript" | "phrases" | "contacts" | "content"; label: string; status: LayerStatus; detail: string };
 export type ScreenResult = {
   verdict: ScreenVerdict; decided_by: ScreenLayer["id"] | "none"; headline: string; explanation: string;
   stated_name: string; stated_reason: string; transcript: string; red_flags: string[]; layers: ScreenLayer[];
@@ -47,8 +50,20 @@ export function screenUserText(transcript: string) {
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+type ContactFinding = { status: LayerStatus; detail: string; mismatch: boolean; name: string; savedPhone: string | null };
+function checkContacts(transcript: string, aiName: string, contacts: TrustedContact[], callerNumber: string | null): ContactFinding | null {
+  if (!contacts.length) return null;
+  const match = matchContact(statedNames(transcript, aiName), contacts);
+  if (!match) return { status: "skipped", detail: "The caller didn't give the name of a saved contact.", mismatch: false, name: "", savedPhone: null };
+  const { contact, heard, exact } = match;
+  const said = exact ? `They said they're ${contact.name}` : `They said “${heard}”, which sounds like your contact ${contact.name}`;
+  if (!contact.phone) return { status: "info", detail: `${said}. No number is saved for ${contact.name}, so it can't be compared.`, mismatch: false, name: contact.name, savedPhone: null };
+  if (!callerNumber) return { status: "info", detail: `${said}. Enter the number they're calling from to compare it with ${contact.name}'s saved number.`, mismatch: false, name: contact.name, savedPhone: contact.phone };
+  if (callerNumber === contact.phone) return { status: "clear", detail: `${said}, calling from ${contact.name}'s saved number. (Caller ID can be faked, so still never send money on a surprise call.)`, mismatch: false, name: contact.name, savedPhone: contact.phone };
+  return { status: "flagged", detail: `${said}, but they're calling from ${formatUsNumber(callerNumber)}, not ${contact.name}'s saved number ${formatUsNumber(contact.phone)}.`, mismatch: true, name: contact.name, savedPhone: contact.phone };
+}
 /** Pure decision logic, so it can be tested without providers. */
-export function decideScreening(input: { number: NumberCheck | null; transcript: string | null; judgment: ContentJudgment | null }): ScreenResult {
+export function decideScreening(input: { number: NumberCheck | null; transcript: string | null; judgment: ContentJudgment | null; contacts?: TrustedContact[] }): ScreenResult {
   const { number, judgment } = input;
   const transcript = (input.transcript ?? "").trim();
   const layers: ScreenLayer[] = [];
@@ -65,7 +80,12 @@ export function decideScreening(input: { number: NumberCheck | null; transcript:
   const phrases = scoreSignals(transcript);
   layers.push({ id: "phrases", label: "Warning phrases", status: !transcript ? "skipped" : phrases.score >= SIGNAL_THRESHOLD ? "flagged" : "clear",
     detail: !transcript ? "Nothing to check." : phrases.signals.length ? phrases.signals.map(s => s.label).join(", ") : "No warning phrases." });
-  // Layer 4: Gemini content judgment.
+  // Layer 4: trusted contacts.
+  const callerNumber = number && number.status !== "invalid" ? number.number : null;
+  const contact = transcript ? checkContacts(transcript, judgment?.stated_name || "", input.contacts || [], callerNumber) : null;
+  layers.push({ id: "contacts", label: "Trusted contacts", status: contact?.status || "skipped",
+    detail: contact?.detail || (input.contacts?.length ? "Nothing to compare." : "No trusted contacts saved on this device.") });
+  // Layer 5: Gemini content judgment.
   layers.push({ id: "content", label: "CallCanary's judgment", status: judgment ? (judgment.verdict === "legit" ? "clear" : "flagged") : transcript ? "unavailable" : "skipped",
     detail: judgment ? judgment.explanation : transcript ? "The AI check wasn't available." : "Nothing to judge." });
 
@@ -73,8 +93,13 @@ export function decideScreening(input: { number: NumberCheck | null; transcript:
   if (number?.status === "reported") return { ...base, verdict: "scam", decided_by: "number",
     headline: "Reported scam number", red_flags: judgment?.red_flags || [],
     explanation: `People have reported this number to the FTC ${plural(number.reports, "time")}. Reported isn't proof, but don't share anything — let it go to voicemail or hang up.` };
-  if (judgment) return { ...base, verdict: judgment.verdict === "likely_scam" ? "scam" : judgment.verdict === "unclear" ? "careful" : "safe", decided_by: "content",
-    headline: judgment.verdict === "likely_scam" ? "This sounds like a scam" : judgment.verdict === "unclear" ? "Be careful" : "Sounds like a real caller",
+  if (judgment?.verdict === "likely_scam") return { ...base, verdict: "scam", decided_by: "content", headline: "This sounds like a scam", explanation: judgment.explanation,
+    red_flags: [...(contact?.mismatch ? [`Claims to be ${contact.name} from a different number`] : []), ...judgment.red_flags] };
+  if (contact?.mismatch) return { ...base, verdict: "careful", decided_by: "contacts", headline: `Is it really ${contact.name}?`,
+    explanation: `They say they're ${contact.name}, but this isn't ${contact.name}'s saved number. Hang up and call ${contact.name} back at ${formatUsNumber(contact.savedPhone!)} before doing anything they ask.`,
+    red_flags: [`Claims to be ${contact.name} from a different number`, ...(judgment?.red_flags || [])] };
+  if (judgment) return { ...base, verdict: judgment.verdict === "unclear" ? "careful" : "safe", decided_by: "content",
+    headline: judgment.verdict === "unclear" ? "Be careful" : contact?.status === "clear" ? `Sounds like ${contact.name}` : "Sounds like a real caller",
     explanation: judgment.explanation, red_flags: judgment.red_flags };
   // No AI verdict: never call it safe.
   if (!transcript) return { ...base, verdict: "careful", decided_by: "transcript", headline: "The caller didn't answer",
@@ -82,4 +107,10 @@ export function decideScreening(input: { number: NumberCheck | null; transcript:
   return { ...base, verdict: "careful", decided_by: phrases.score >= SIGNAL_THRESHOLD ? "phrases" : "none", headline: "Be careful",
     explanation: phrases.score >= SIGNAL_THRESHOLD ? `The caller used warning phrases: ${phrases.signals.map(s => s.label.toLowerCase()).join(", ")}. CallCanary's full check wasn't available.` : "CallCanary's full check wasn't available. Only talk to them if you recognise who they are.",
     red_flags: phrases.signals.map(s => s.label) };
+}
+/** Progress snapshot: layers that haven't run yet are shown as pending. */
+export function pendingLayers(result: ScreenResult, pending: ScreenLayer["id"][]): ScreenLayer[] {
+  const waiting: Record<ScreenLayer["id"], string> = { number: "Checking the number…", transcript: "Turning the reply into words…", phrases: "Looking for warning phrases…",
+    contacts: "Comparing with your trusted contacts…", content: "CallCanary is thinking about what they said…" };
+  return result.layers.map(layer => pending.includes(layer.id) ? { ...layer, status: "pending", detail: waiting[layer.id] } : layer);
 }
