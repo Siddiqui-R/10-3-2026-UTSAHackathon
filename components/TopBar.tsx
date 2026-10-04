@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Mail, Phone, PhoneIncoming, ShieldCheck, LayoutDashboard } from "lucide-react";
-type Tool = "call" | "email" | "demo" | "screen";
+import { History, Mail, Phone, PhoneIncoming, ShieldCheck, LayoutDashboard } from "lucide-react";
+type Tool = "call" | "email" | "demo" | "screen" | "history";
 const tools: { id: Tool; href: string; label: string; Icon: typeof Phone }[] = [
   { id: "demo", href: "/demo", label: "App demo", Icon: LayoutDashboard },
   { id: "screen", href: "/screen", label: "Screen a caller", Icon: PhoneIncoming },
   { id: "call", href: "/", label: "Listen to a call", Icon: Phone },
   { id: "email", href: "/email", label: "Check an email", Icon: Mail },
+  { id: "history", href: "/history", label: "Recent checks", Icon: History },
 ];
 export default function TopBar({ active, children }: { active: Tool; children?: React.ReactNode }) {
   return <header className="topbar-wrap">

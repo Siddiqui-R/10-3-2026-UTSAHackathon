@@ -47,6 +47,10 @@ Each layer appears as soon as it finishes (the server streams progress), so the 
 
 The FTC list ships with the app as `data/ftc-reported-numbers.tsv.gz` (about 196,000 numbers, 1.1 MB, binary-searched in memory), so there's no database to keep running. Refresh it with `node scripts/build-ftc-index.mjs 30` and redeploy. The page shows the dates it covers.
 
+## Recent checks (/history)
+
+Every screened call, number lookup, email check and call-listening verdict is saved as a short summary on this device only: verdict, name and reason, number, sender, counts of bad links and typos. Never recordings, full transcripts or email text. Newest first, grouped by day, at most 50. Sample runs are tagged. Delete one entry, clear everything (with a confirmation), or turn history off, which also deletes it. If browser storage is blocked, the tools work normally and nothing is saved.
+
 ## Check an email (/email)
 
 Paste a whole email (plain text or HTML) or just a link. Two layers:

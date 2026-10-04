@@ -6,6 +6,7 @@ import Mascot from "@/components/Mascot";
 import EmailResultView from "@/components/EmailResultView";
 import type { EmailResult } from "@/lib/emailAnalysis";
 import { DEMO_PHISHING_EMAIL } from "@/lib/demoTranscripts";
+import { addHistory } from "@/lib/history";
 
 export default function EmailCheck() {
   const [mode, setMode] = useState<"email" | "link">("email");
@@ -23,7 +24,16 @@ export default function EmailCheck() {
       const response = await fetch("/api/analyze-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emailText }), signal: controller.signal });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "The email check could not finish. Please try again.");
-      if (!controller.signal.aborted) setResult(data);
+      if (!controller.signal.aborted) {
+        const checked = data as EmailResult;
+        setResult(checked);
+        const dangerous = checked.links.filter(link => link.verdict !== "safe").length;
+        addHistory({ kind: "email", verdict: checked.level === "phishing" ? "scam" : checked.level === "suspicious" ? "careful" : "safe", sample: emailText === DEMO_PHISHING_EMAIL,
+          title: `Checked ${mode === "link" ? "a link" : "an email"}: ${checked.level === "phishing" ? "phishing" : checked.level === "suspicious" ? "be careful" : "looks safe"}`,
+          details: [checked.sender?.address ? `From ${checked.sender.address}${checked.sender.spoofed ? " (fake sender)" : ""}` : "",
+            checked.links.length ? `${checked.links.length} ${checked.links.length === 1 ? "link" : "links"}, ${dangerous} not what ${dangerous === 1 ? "it seems" : "they seem"}` : "",
+            checked.typos.length ? `${checked.typos.length} spelling ${checked.typos.length === 1 ? "mistake" : "mistakes"}` : ""] });
+      }
     } catch (cause) {
       if (!controller.signal.aborted) setError(cause instanceof Error && cause.name !== "AbortError" ? cause.message : "The email check could not finish. Please try again.");
     } finally { if (request.current === controller) setBusy(false); }

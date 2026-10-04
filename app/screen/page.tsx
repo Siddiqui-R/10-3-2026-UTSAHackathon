@@ -13,6 +13,7 @@ import { loadContacts, saveContacts } from "@/lib/contactStore";
 import { formatUsNumber, normalizeUsNumber } from "@/lib/phoneNumber";
 import { DEMO_CONTACTS, SCREEN_DEMOS, type ScreenDemo } from "@/lib/screenDemos";
 import { speakWithDeviceVoice } from "@/lib/deviceVoice";
+import { addHistory } from "@/lib/history";
 
 type Stage = "idle" | "greeting" | "recording" | "checking" | "done";
 const MAX_REPLY_MS = 20_000;
@@ -68,11 +69,17 @@ export default function ScreenCaller() {
 
   async function checkNumber() {
     setLooking(true); setLookup(null);
-    try { setLookup(await (await fetch(`/api/check-number?phone=${encodeURIComponent(phone)}`)).json()); }
+    try {
+      const found: NumberCheck & { error?: string } = await (await fetch(`/api/check-number?phone=${encodeURIComponent(phone)}`)).json();
+      setLookup(found);
+      if (found.status === "reported" || found.status === "not_reported") addHistory({ kind: "number", verdict: found.status === "reported" ? "scam" : "info",
+        title: found.status === "reported" ? `Checked a number: reported ${found.reports} ${found.reports === 1 ? "time" : "times"}` : "Checked a number: not on the FTC list",
+        details: [formatUsNumber(found.number), found.status === "reported" ? `Most recently ${found.last_reported}, “${found.topic}”` : `FTC complaints ${found.from} to ${found.to}`] });
+    }
     catch { setLookup({ status: "unavailable", number: phone, detail: "The check could not finish. Please try again." }); }
     finally { setLooking(false); }
   }
-  async function submit(audio: Blob, callerPhone: string, contactList: TrustedContact[], isCancelled: () => boolean) {
+  async function submit(audio: Blob, callerPhone: string, contactList: TrustedContact[], isCancelled: () => boolean, sample?: ScreenDemo) {
     setStage("checking"); setProgress(null);
     const form = new FormData();
     form.append("audio", audio, audio.type.includes("mp4") ? "reply.mp4" : audio.type.includes("mpeg") ? "reply.mp3" : "reply.webm");
@@ -80,7 +87,13 @@ export default function ScreenCaller() {
     form.append("contacts", JSON.stringify(contactList));
     try {
       const final = await runScreen(form, update => { if (!isCancelled()) setProgress(update); });
-      if (!isCancelled()) { setResult(final); setStage("done"); }
+      if (!isCancelled()) {
+        setResult(final); setStage("done");
+        const digits = normalizeUsNumber(callerPhone);
+        const decided = final.layers.find(layer => layer.id === final.decided_by)?.label;
+        addHistory({ kind: "screen", verdict: final.verdict, title: `Screened a call: ${final.headline}`, sample: !!sample,
+          details: [[final.stated_name, final.stated_reason].filter(Boolean).join(" — "), digits ? formatUsNumber(digits) : "", decided ? `Decided by: ${decided}` : ""] });
+      }
     } catch (cause) { if (!isCancelled()) { setError(cause instanceof Error ? cause.message : "The screen could not finish."); setStage("idle"); } }
   }
 
@@ -137,7 +150,7 @@ export default function ScreenCaller() {
     let audio: Blob;
     try { audio = await (await fetch(sample.audio)).blob(); }
     catch { setError("The sample call couldn't be loaded."); setStage("idle"); return; }
-    await submit(new Blob([audio], { type: "audio/mpeg" }), sample.phone, DEMO_CONTACTS, () => stopped);
+    await submit(new Blob([audio], { type: "audio/mpeg" }), sample.phone, DEMO_CONTACTS, () => stopped, sample);
   }
 
   async function sayGoodbye() {

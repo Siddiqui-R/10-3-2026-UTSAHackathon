@@ -8,6 +8,7 @@ import { analyzeTranscript, useListening } from "@/lib/useListening";
 import RiskMeter from "@/components/RiskMeter";
 import WarningTakeover from "@/components/WarningTakeover";
 import TopBar from "@/components/TopBar";
+import { addHistory } from "@/lib/history";
 import Mascot, { type MascotMood } from "@/components/Mascot";
 import { warningText } from "@/lib/warningText";
 import { speakWithDeviceVoice } from "@/lib/deviceVoice";
@@ -60,8 +61,11 @@ export default function Home() {
       if (!speakWithDeviceVoice(text, { onStart: () => {}, onEnd: done, onError: done })) done();
     }
   }
-  function handleVerdict(verdict: Analysis) {
+  function handleVerdict(verdict: Analysis, sample = false) {
     setResult(verdict);
+    addHistory({ kind: "call", verdict: verdict.level === "scam" ? "scam" : verdict.level === "suspicious" ? "careful" : "safe", sample,
+      title: `Listened to a call: ${verdict.level === "scam" ? "scam detected" : verdict.level === "suspicious" ? "warning signs" : "looked safe"}`,
+      details: verdict.reasons.slice(0, 2) });
     if (verdict.level === "scam") void prepareWarning(verdict);
   }
   useEffect(() => { if (audioUrl) return () => URL.revokeObjectURL(audioUrl); }, [audioUrl]);
@@ -98,7 +102,7 @@ export default function Home() {
     const controller = new AbortController(); demoRequest.current = controller;
     try {
       const verdict = await analyzeTranscript(demoTranscripts[type], controller.signal);
-      if (!controller.signal.aborted) handleVerdict(verdict);
+      if (!controller.signal.aborted) handleVerdict(verdict, true);
     } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "The demo could not finish."); }
     finally { if (demoRequest.current === controller) { demoLock.current = false; setDemoBusy(false); } }
   }
