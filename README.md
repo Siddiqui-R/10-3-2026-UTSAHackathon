@@ -31,6 +31,19 @@ The ElevenLabs key needs Text to Speech, Speech to Text, Voices read and Models 
 - While listening, the page asks the browser for a screen wake lock and shows whether it was granted.
 - Listening continues until stopped or a scam intervention. Browser suspension, page closure, locked devices and browser permission policies can interrupt it. This web app cannot guarantee system-wide background monitoring or directly intercept telephone audio.
 
+## Screen a caller (/screen)
+
+For calls from unknown numbers. Answer on speaker and tap **Answer with CallCanary**. The canary's voice asks the caller for their name and the reason for the call. Recording starts only after the greeting, so CallCanary never records itself. It stops when the caller goes quiet, after 20 seconds, or if they never speak. Then layered checks run (`lib/screening.ts`):
+
+1. **Reported-number list:** the caller's number, if entered, is looked up in FTC Do Not Call complaint reports. A match decides the result ("Reported scam number"). Reported isn't proof, and caller ID can be faked; the page says so.
+2. **What the caller said:** ElevenLabs transcription. Silence is a warning sign, not a verdict.
+3. **Warning phrases:** the same weighted phrases as call listening. Context only; never decides alone.
+4. **CallCanary's judgment:** Gemini judges the content (likely scam / unclear / real caller) and extracts the stated name and reason. The transcript is treated as untrusted data.
+
+The result shows every layer and marks the one that **decided**. Without Gemini the result is never "safe". For scams, **Have CallCanary say goodbye** tells the caller the person isn't available. The number check also works on its own.
+
+The FTC list ships with the app as `data/ftc-reported-numbers.tsv.gz` (about 196,000 numbers, 1.1 MB, binary-searched in memory), so there's no database to keep running. Refresh it with `node scripts/build-ftc-index.mjs 30` and redeploy. The page shows the dates it covers.
+
 ## Check an email (/email)
 
 Paste a whole email (plain text or HTML) or just a link. Two layers:
@@ -69,7 +82,7 @@ Push to **Siddiqui-R/10-3-2026-UTSAHackathon**, import it in Vercel with the Nex
 
 Set `GEMINI_MODEL` (for example `gemini-3.6-flash`) in Vercel to pin a model that answers quickly. Without it, the route discovers Flash models, tries the last one that worked first, and benches overloaded (503), rate-limited (429) or hanging models for two minutes.
 
-Optional Tiger Data logging/dashboard is not implemented. DATABASE_URL is reserved for that stretch feature. No transcripts or recordings are stored in a database.
+DATABASE_URL is reserved; no transcripts or recordings are stored in a database.
 
 ## Connected application demo
 

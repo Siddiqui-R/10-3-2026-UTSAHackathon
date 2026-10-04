@@ -1,12 +1,17 @@
 import Link from "next/link";
-import { Mail, Phone, ShieldCheck, LayoutDashboard } from "lucide-react";
-export default function TopBar({ active, children }: { active: "call" | "email" | "demo"; children?: React.ReactNode }) {
+import { Mail, Phone, PhoneIncoming, ShieldCheck, LayoutDashboard } from "lucide-react";
+type Tool = "call" | "email" | "demo" | "screen";
+const tools: { id: Tool; href: string; label: string; Icon: typeof Phone }[] = [
+  { id: "demo", href: "/demo", label: "App demo", Icon: LayoutDashboard },
+  { id: "screen", href: "/screen", label: "Screen a caller", Icon: PhoneIncoming },
+  { id: "call", href: "/", label: "Listen to a call", Icon: Phone },
+  { id: "email", href: "/email", label: "Check an email", Icon: Mail },
+];
+export default function TopBar({ active, children }: { active: Tool; children?: React.ReactNode }) {
   return <header className="topbar-wrap">
     <div className="topbar"><div className="brand"><div className="brand-mark"><ShieldCheck size={28} /></div>CallCanary</div>{children}</div>
     <nav className="tabs" aria-label="CallCanary tools">
-      <Link href="/demo" className={active === "demo" ? "tab tab-active" : "tab"} aria-current={active === "demo" ? "page" : undefined}><LayoutDashboard size={24} />App demo</Link>
-      <Link href="/" className={active === "call" ? "tab tab-active" : "tab"} aria-current={active === "call" ? "page" : undefined}><Phone size={24} />Listen to a call</Link>
-      <Link href="/email" className={active === "email" ? "tab tab-active" : "tab"} aria-current={active === "email" ? "page" : undefined}><Mail size={24} />Check an email</Link>
+      {tools.map(({ id, href, label, Icon }) => <Link key={id} href={href} className={active === id ? "tab tab-active" : "tab"} aria-current={active === id ? "page" : undefined}><Icon size={24} />{label}</Link>)}
     </nav>
   </header>;
 }

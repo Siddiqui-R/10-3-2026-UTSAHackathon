@@ -126,8 +126,9 @@ async function run() {
   assert.equal((await (await transcribe(recordingRequest())).json()).transcript, '');
   require('./scoring.cjs')();
   await require('./email.cjs')();
+  await require('./screen.cjs')();
   await require('./listening.cjs')();
-  console.log('PASS: weighted signals, score boundaries, malformed verdicts, model discovery, retries/fallbacks, contextual speech cache, upload/silence handling, continuous listening lifecycle and cleanup, email link checks and phishing verdicts.');
+  console.log('PASS: weighted signals, score boundaries, malformed verdicts, model discovery, retries/fallbacks, contextual speech cache, upload/silence handling, continuous listening lifecycle and cleanup, email link checks and phishing verdicts, caller screening and reported numbers.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
   global.fetch = originalFetch; Module._load = originalLoad; Module._extensions['.ts'] = originalTs;

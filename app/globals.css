@@ -386,3 +386,28 @@ button:disabled { opacity: .6; cursor: wait; }
 .demo-activity { display: flex; gap: 10px; padding: 18px 20px; border: 1px solid #b8d1c1; background: #eaf3e8; color: var(--green-dark); border-radius: 16px; margin-top: 24px; font-size: 16px; line-height: 1.5; }
 @media (max-width: 900px) { .demo-workspace { grid-template-columns: 1fr; } .demo-heading { align-items: flex-start; flex-direction: column; gap: 12px; } }
 @media (max-width: 620px) { .tabs { flex-wrap: wrap; } .tab { min-width: 130px; } .integration-card { padding: 16px; } .demo-phone { padding: 14px; } .demo-account { flex-wrap: wrap; } }
+/* Screen a caller. */
+.screen-number { width: 100%; display: grid; gap: 10px; margin-bottom: 16px; }
+.screen-number label { display: flex; align-items: center; gap: 8px; font: 800 24px/1.3 'Manrope', sans-serif; }
+.screen-number input { width: 100%; font-size: 24px; padding: 14px 16px; border: 3px solid #5d6b62; border-radius: 14px; }
+.screen-number input:focus { outline: 4px solid #e3a523; outline-offset: 2px; }
+.number-result { padding: 14px 16px; border-radius: 14px; border: 3px solid; font-size: 20px; line-height: 1.5; }
+.number-result p { margin: 0 0 6px; }
+.number-reported { background: #fff1f1; border-color: #b3141b; color: #5c0a0e; }
+.number-clear { background: #f2faf4; border-color: #7fbf95; color: #0f4a28; }
+.screen-steps { margin: 0; padding-left: 26px; font-size: 21px; line-height: 1.6; }
+.screen-live { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.screen-live h2 { font: 800 30px/1.25 'Manrope', sans-serif; margin: 0; }
+.email-content > .check-card { width: 100%; margin-bottom: 16px; }
+.layer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.layer-list li { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 12px; border: 2px solid #e2e8e3; font-size: 20px; line-height: 1.45; }
+.layer-list li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.layer-list small { display: block; font-size: 18px; color: #46544c; margin-top: 2px; }
+.layer-decided { border-color: #17261f !important; background: #fffbea; }
+.layer-icon { font-size: 26px; line-height: 1.2; flex-shrink: 0; width: 30px; text-align: center; }
+.decided-badge { margin-left: 8px; padding: 2px 10px; border-radius: 99px; background: #17261f; color: #fff; font-style: normal; font-size: 15px; font-weight: 800; vertical-align: middle; }
+.confirm-box p svg, .form-hint svg { vertical-align: -3px; }
+@media (max-width: 620px) {
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .tab { max-width: none; }
+}

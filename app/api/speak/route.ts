@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { WARNING_SCRIPT } from "@/lib/demoTranscripts";
 import { warningText, type SpokenLevel } from "@/lib/warningText";
 import { MASCOT_VOICE_SETTINGS, mascotVoiceId, TTS_MODEL } from "@/lib/voice";
+import { SCREEN_GOODBYE, SCREEN_GREETING } from "@/lib/screening";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 // Bounded cache, keyed by voice + content, so explanations never leak across verdicts.
@@ -13,6 +14,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (body?.text === WARNING_SCRIPT && body.reasons === undefined) text = WARNING_SCRIPT;
+    // Fixed screening lines, so the caller hears the same canary voice.
+    else if (body?.script === "greeting" || body?.script === "goodbye") text = body.script === "greeting" ? SCREEN_GREETING : SCREEN_GOODBYE;
     else {
       if (!Array.isArray(body?.reasons) || body.reasons.length < 1 || body.reasons.length > 3 ||
         !body.reasons.every((r: unknown) => typeof r === "string" && r.trim().length > 0 && r.length <= 500))
