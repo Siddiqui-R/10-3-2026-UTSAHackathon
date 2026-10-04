@@ -21,6 +21,18 @@ class Store(context: Context) {
     var blockHidden: Boolean
         get() = prefs.getBoolean("blockHidden", false)
         set(value) = prefs.edit().putBoolean("blockHidden", value).apply()
+    /** Offer to listen when an unknown number calls. */
+    var offerListening: Boolean
+        get() = prefs.getBoolean("offerListening", true)
+        set(value) = prefs.edit().putBoolean("offerListening", value).apply()
+    /** Say the scam warning out loud during a call (the caller hears it too, on speaker). */
+    var speakWarnings: Boolean
+        get() = prefs.getBoolean("speakWarnings", true)
+        set(value) = prefs.edit().putBoolean("speakWarnings", value).apply()
+    /** Save a recording of protected calls on this phone. Off by default: the person chooses, and should tell the caller. */
+    var recordCalls: Boolean
+        get() = prefs.getBoolean("recordCalls", false)
+        set(value) = prefs.edit().putBoolean("recordCalls", value).apply()
     /** The Google account the person connected on the Connect tab, or null. */
     var gmailAccount: String?
         get() = prefs.getString("gmailAccount", null)

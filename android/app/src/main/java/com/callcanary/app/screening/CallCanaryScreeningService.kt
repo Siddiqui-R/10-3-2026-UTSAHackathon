@@ -34,7 +34,11 @@ class CallCanaryScreeningService : CallScreeningService() {
                 store.addEvent("call", "${if (store.silenceOnly) "Silenced" else "Blocked"} a call from $shown", decision.reason, blocked = true)
                 Notifications.blockedCall(this, shown, decision.reason, silenced = store.silenceOnly)
             }
-            is Decision.Allow -> store.addEvent("call", "Call from $shown", decision.note, blocked = false)
+            is Decision.Allow -> {
+                store.addEvent("call", "Call from $shown", decision.note, blocked = false)
+                // Not on any list, but still a stranger: offer to listen in case it turns into a scam.
+                if (store.offerListening) Notifications.offerProtection(this, number?.let { PhoneNumbers.format(it) }, decision.note)
+            }
         }
         Log.i(TAG, "screened $shown -> $decision")
         respondToCall(details, response.build())

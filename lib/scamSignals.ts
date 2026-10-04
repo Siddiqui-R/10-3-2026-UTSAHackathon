@@ -87,7 +87,7 @@ const rules: Rule[] = [
 const REASSURANCE = /\b(?:don'?t|do not|dont) (?:worry|panic|be scared|be afraid)\b|\bno (?:problem|worries)\b|\bnot a problem\b/g;
 const NEGATORS = /\b(?:not|never|don'?t|dont|doesn'?t|won'?t|will not|wouldn'?t|can'?t|cannot|isn'?t|aren'?t|nobody|no one|refuse|refused|didn'?t)\b/;
 // Reported speech ("they'll say", "if someone asks you to") marks advice even when the quoted words are a direct demand.
-const REPORTED = /\b(?:they(?:'ll| will| might| may| would)? (?:say|ask|tell you)|will say|might say|would say|asks? you to|if (?:someone|anyone|a caller|they) (?:asks?|tells?|says?))b/;
+const REPORTED = /\b(?:they(?:'ll| will| might| may| would)? (?:say|ask|tell you)|will say|might say|would say|asks? you to|if (?:someone|anyone|a caller|they) (?:asks?|tells?|says?))\b/;
 // Talking *about* scams (news, warnings, family advice) rather than being targeted by one.
 const DISCUSSION = /\b(?:scams?|scammers?|scammed|con artists?|fraudsters?|hoax|on the news|news (?:said|story|report)|article|read about|heard about|warned (?:me|us|you)|warning about|watch out for|be careful (?:of|about|with)|they (?:tried|try) to|tried to trick|trying to trick|fake call|fake caller|pretend(?:ed|ing)? to be|pretend|the bank will never|will never (?:call|ask)|never ask(?:s)? for)\b/;
 export const SIGNAL_THRESHOLD = 35;

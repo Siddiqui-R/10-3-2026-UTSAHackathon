@@ -68,6 +68,7 @@ private fun time(at: Long) = DateFormat.getTimeInstance(DateFormat.SHORT).format
 fun HomeScreen(screeningOn: Boolean, notificationsOn: Boolean, store: Store, refresh: Int, onTurnOn: () -> Unit, onNotifications: () -> Unit, onCheck: () -> Unit) {
     val events = remember(refresh) { store.events() }
     val blockedCalls = events.count { it.kind == "call" && it.blocked }
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.verticalScroll(rememberScrollState())) {
         Hero("Your canary in the coal mine", if (screeningOn) "You're protected" else "Protection is off",
             if (screeningOn) "CallCanary checks every call from a number that isn't in your contacts." else "Turn on call screening so CallCanary can stop scam calls before your phone rings.") {
@@ -80,6 +81,7 @@ fun HomeScreen(screeningOn: Boolean, notificationsOn: Boolean, store: Store, ref
                 Stat("Scam calls stopped", blockedCalls, Modifier.weight(1f))
                 Stat("Numbers you blocked", store.blocked().size, Modifier.weight(1f))
             }
+            BigButton("Protect a call I'm on", { context.startActivity(com.callcanary.app.listen.ListenActivity.intent(context, null, autoStart = false)) }, color = CC.Coal)
             BigButton("Check a link, text or email", onCheck)
             Section {
                 Text("Recent activity", style = MaterialTheme.typography.titleLarge)
@@ -282,6 +284,9 @@ fun SettingsScreen(store: Store, reported: ReportedNumbers?, refresh: Int, onCha
                 Toggle("Block numbers reported to the FTC", "Uses the FTC's public Do Not Call complaint reports. Reported isn't proof, but these numbers are complained about a lot.", store.blockReported) { store.blockReported = it; onChanged() }
                 Toggle("Silence instead of rejecting", "The call goes quietly to voicemail instead of being hung up.", store.silenceOnly) { store.silenceOnly = it; onChanged() }
                 Toggle("Block hidden numbers", "Stop calls that hide their number.", store.blockHidden) { store.blockHidden = it; onChanged() }
+                Toggle("Offer to listen to unknown callers", "When a number that isn't blocked calls, a notification lets you turn on live protection.", store.offerListening) { store.offerListening = it; onChanged() }
+                Toggle("Say warnings out loud", "During a call on speaker, CallCanary says the scam warning so you can't miss it. The caller hears it too.", store.speakWarnings) { store.speakWarnings = it; onChanged() }
+                Toggle("Save call recordings", "Keeps a recording and transcript of protected calls on this phone only. Tell the other person you're recording.", store.recordCalls) { store.recordCalls = it; onChanged() }
             }
             Section {
                 Text("Scam number list", style = MaterialTheme.typography.titleLarge)

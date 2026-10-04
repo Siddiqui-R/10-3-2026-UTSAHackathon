@@ -4,6 +4,7 @@ import com.callcanary.app.data.CheckApi
 import com.callcanary.app.data.Decision
 import com.callcanary.app.data.PhoneNumbers
 import com.callcanary.app.data.ReportedNumbers
+import com.callcanary.app.data.ScamSignals
 import com.callcanary.app.data.Screener
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -68,5 +69,20 @@ class CallCanaryTest {
         // A link with no domain in its text falls back to the text itself.
         val bare = CheckApi.parse(JSONObject("""{"level":"suspicious","links":[{"display_text":"bit.ly/abc","shown_domain":null,"actual_domain":"bit.ly","verdict":"suspicious"}]}"""))
         assertEquals("bit.ly/abc", bare.links[0].shown)
+    }
+
+    @Test fun scoresScamSpeechLikeTheWebsite() {
+        val scam = ScamSignals.score("This is the fraud department from your bank. Read me the code we just texted you, and don't tell anyone. You must pay today with gift cards.")
+        assertTrue(scam.score >= ScamSignals.THRESHOLD)
+        val ids = scam.signals.map { it.id }
+        assertTrue("code" in ids); assertTrue("secrecy" in ids); assertTrue("gift" in ids)
+        // An ordinary call stays quiet.
+        assertEquals(0, ScamSignals.score("Hi grandma, just calling to say we'll be there Sunday for lunch.").score)
+        // Talking about scams is not being scammed.
+        val advice = ScamSignals.score("The news said scammers will ask you to buy gift cards. If anyone asks you to, hang up.")
+        assertTrue(advice.score < ScamSignals.THRESHOLD)
+        // Negated: "I will never ask for your password".
+        assertTrue(ScamSignals.score("we will never ask you to give us your password").score < ScamSignals.THRESHOLD)
+        assertEquals(100, ScamSignals.score("warrant arrest gift card numbers wire transfer bitcoin atm anydesk read me the code").score)
     }
 }

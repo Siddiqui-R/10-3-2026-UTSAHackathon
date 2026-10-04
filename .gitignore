@@ -26,3 +26,5 @@ android/.kotlin/
 artifacts/elevenlabs-key-draft.png
 artifacts/domain-connected.png
 artifacts/production-connected.png
+
+.claude/settings.local.json
