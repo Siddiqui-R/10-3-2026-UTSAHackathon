@@ -21,3 +21,8 @@ android/build/
 android/app/build/
 android/local.properties
 android/.kotlin/
+
+# Local account and deployment verification screenshots
+artifacts/elevenlabs-key-draft.png
+artifacts/domain-connected.png
+artifacts/production-connected.png

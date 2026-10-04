@@ -194,6 +194,49 @@ private fun CheckResult(r: CheckApi.Result) {
     }
 }
 
+/** Hook CallCanary up to your calls and your Gmail. */
+@Composable
+fun ConnectScreen(screeningOn: Boolean, notificationsOn: Boolean, gmailAccount: String?, onAllowCalls: () -> Unit, onNotifications: () -> Unit,
+                  onConnectGmail: () -> Unit, onDisconnectGmail: () -> Unit, onOpenGmail: () -> Unit) {
+    Column(Modifier.verticalScroll(rememberScrollState())) {
+        Hero("Connect", "Let CallCanary watch out for you", "Give it access to your calls and connect your email.")
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Section {
+                ConnectHeader("Phone calls", screeningOn)
+                Text(if (screeningOn) "CallCanary checks every call from a number that isn't in your contacts and stops scam calls before your phone rings."
+                    else "Allow CallCanary to screen your calls. Android will ask you to set it as your caller ID & spam app.", color = CC.Muted)
+                if (!screeningOn) BigButton("Allow access to calls", onAllowCalls, color = CC.Lamp, textColor = CC.Coal)
+            }
+            Section {
+                ConnectHeader("Gmail", gmailAccount != null)
+                if (gmailAccount == null) {
+                    Text("Connect your Gmail account so CallCanary can help you spot fake emails.", color = CC.Muted)
+                    BigButton("Connect Gmail", onConnectGmail, color = CC.Lamp, textColor = CC.Coal)
+                } else {
+                    Text(buildAnnotatedString { append("Connected as "); withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(gmailAccount) } })
+                    Text("To check an email, select its text in Gmail and tap \"Check with CallCanary\", or share it to CallCanary.", color = CC.Muted)
+                    BigButton("Open Gmail", onOpenGmail)
+                    BigButton("Disconnect", onDisconnectGmail, color = Color.White, textColor = CC.Danger)
+                }
+            }
+            Section {
+                ConnectHeader("Notifications", notificationsOn)
+                Text("Get a notice every time CallCanary blocks a call.", color = CC.Muted)
+                if (!notificationsOn) BigButton("Allow notifications", onNotifications, color = Color.White, textColor = CC.Pine)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectHeader(title: String, on: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text(if (on) "Connected" else "Not connected", color = if (on) CC.Safe else CC.Muted, fontWeight = FontWeight.Bold,
+            modifier = Modifier.background(if (on) CC.SafeSoft else Color(0xFFECEFEA), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
+    }
+}
+
 @Composable
 fun BlockedScreen(store: Store, refresh: Int, onChanged: () -> Unit) {
     var number by rememberSaveable { mutableStateOf("") }

@@ -1,6 +1,7 @@
 package com.callcanary.app
 
 import android.Manifest
+import android.accounts.AccountManager
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -15,7 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -39,7 +40,7 @@ import com.callcanary.app.data.Store
 import com.callcanary.app.ui.BlockedScreen
 import com.callcanary.app.ui.CC
 import com.callcanary.app.ui.CallCanaryTheme
-import com.callcanary.app.ui.CheckScreen
+import com.callcanary.app.ui.ConnectScreen
 import com.callcanary.app.ui.HomeScreen
 import com.callcanary.app.ui.SettingsScreen
 import com.callcanary.app.ui.demo.DemoStage
@@ -54,10 +55,19 @@ class MainActivity : ComponentActivity() {
     private var screeningOn by mutableStateOf(false)
     private var notificationsOn by mutableStateOf(false)
     private var reported by mutableStateOf<ReportedNumbers?>(null)
+    private var gmailAccount by mutableStateOf<String?>(null)
+    private lateinit var store: Store
 
     // Android asks the person to make CallCanary the call screening app.
     private val roleRequest = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { updateStatus() }
     private val notificationRequest = registerForActivityResult(ActivityResultContracts.RequestPermission()) { updateStatus() }
+    // Android's own Google account picker; the chosen account is remembered on this phone.
+    private val accountRequest = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)?.let { name ->
+            store.gmailAccount = name; gmailAccount = name
+            store.addEvent("connect", "Connected Gmail", name, blocked = false); refresh++
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +75,8 @@ class MainActivity : ComponentActivity() {
         Notifications.ensureChannel(this)
         // Load the FTC list now so the first screened call doesn't wait for it.
         lifecycleScope.launch { reported = withContext(Dispatchers.IO) { runCatching { ReportedNumbers.get(this@MainActivity) }.getOrNull() } }
-        val store = Store(this)
+        store = Store(this)
+        gmailAccount = store.gmailAccount
         setContent {
             CallCanaryTheme {
                 var tab by rememberSaveable { mutableStateOf(0) }
@@ -74,7 +85,7 @@ class MainActivity : ComponentActivity() {
                 demo?.let { scenes -> DemoStage(scenes, store) { demo = null; refresh++ }; return@CallCanaryTheme }
                 Scaffold(containerColor = CC.Paper, bottomBar = {
                     NavigationBar(containerColor = CC.Coal) {
-                        listOf("Home" to Icons.Filled.Home, "Check" to Icons.Filled.Search, "Blocked" to Icons.Filled.Lock, "Demo" to Icons.Filled.PlayArrow, "Settings" to Icons.Filled.Settings).forEachIndexed { i, (label, icon) ->
+                        listOf("Home" to Icons.Filled.Home, "Connect" to Icons.Filled.Link, "Blocked" to Icons.Filled.Lock, "Demo" to Icons.Filled.PlayArrow, "Settings" to Icons.Filled.Settings).forEachIndexed { i, (label, icon) ->
                             NavigationBarItem(selected = tab == i, onClick = { tab = i; refresh++ }, icon = { Icon(icon, contentDescription = null) },
                                 label = { Text(label, fontSize = 14.sp) },
                                 colors = NavigationBarItemDefaults.colors(selectedIconColor = CC.Coal, selectedTextColor = CC.Lamp, indicatorColor = CC.Lamp,
@@ -85,8 +96,9 @@ class MainActivity : ComponentActivity() {
                     val modifier = Modifier.fillMaxSize().padding(padding)
                     androidx.compose.foundation.layout.Box(modifier) {
                         when (tab) {
-                            0 -> HomeScreen(screeningOn, notificationsOn, store, refresh, onTurnOn = ::requestScreening, onNotifications = ::requestNotifications, onCheck = { tab = 1 })
-                            1 -> CheckScreen(store = store)
+                            0 -> HomeScreen(screeningOn, notificationsOn, store, refresh, onTurnOn = ::requestScreening, onNotifications = ::requestNotifications, onCheck = { startActivity(Intent(this@MainActivity, CheckActivity::class.java)) })
+                            1 -> ConnectScreen(screeningOn, notificationsOn, gmailAccount, onAllowCalls = ::requestScreening, onNotifications = ::requestNotifications,
+                                onConnectGmail = ::connectGmail, onDisconnectGmail = { store.gmailAccount = null; gmailAccount = null }, onOpenGmail = ::openGmail)
                             2 -> BlockedScreen(store, refresh) { refresh++ }
                             3 -> DemoTourScreen { demo = it }
                             else -> SettingsScreen(store, reported, refresh, onChanged = { refresh++ }, onClearHistory = { store.clearEvents(); refresh++ })
@@ -109,6 +121,11 @@ class MainActivity : ComponentActivity() {
         if (roles.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING)) roleRequest.launch(roles.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
     }
     private fun requestNotifications() = notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+    private fun connectGmail() = accountRequest.launch(AccountManager.newChooseAccountIntent(null, null, arrayOf("com.google"), null, null, null, null))
+    private fun openGmail() {
+        val gmail = packageManager.getLaunchIntentForPackage("com.google.android.gm")
+        startActivity(gmail ?: Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://mail.google.com")))
+    }
 
     companion object { fun open(from: android.content.Context) = from.startActivity(Intent(from, MainActivity::class.java)) }
 }

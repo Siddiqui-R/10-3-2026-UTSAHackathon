@@ -21,6 +21,10 @@ class Store(context: Context) {
     var blockHidden: Boolean
         get() = prefs.getBoolean("blockHidden", false)
         set(value) = prefs.edit().putBoolean("blockHidden", value).apply()
+    /** The Google account the person connected on the Connect tab, or null. */
+    var gmailAccount: String?
+        get() = prefs.getString("gmailAccount", null)
+        set(value) = prefs.edit().putString("gmailAccount", value).apply()
 
     fun blocked(): List<BlockedNumber> = array("blocked").let { a ->
         List(a.length()) { a.getJSONObject(it).let { o -> BlockedNumber(o.getString("number"), o.optString("reason"), o.optLong("at")) } }
