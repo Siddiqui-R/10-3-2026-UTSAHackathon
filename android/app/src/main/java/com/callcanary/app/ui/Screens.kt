@@ -198,8 +198,8 @@ private fun CheckResult(r: CheckApi.Result) {
 
 /** Hook CallCanary up to your calls and your Gmail. */
 @Composable
-fun ConnectScreen(screeningOn: Boolean, notificationsOn: Boolean, gmailAccount: String?, onAllowCalls: () -> Unit, onNotifications: () -> Unit,
-                  onConnectGmail: () -> Unit, onDisconnectGmail: () -> Unit, onOpenGmail: () -> Unit) {
+fun ConnectScreen(screeningOn: Boolean, notificationsOn: Boolean, messagesOn: Boolean, gmailAccount: String?, onAllowCalls: () -> Unit, onNotifications: () -> Unit,
+                  onAllowMessages: () -> Unit, onConnectGmail: () -> Unit, onDisconnectGmail: () -> Unit, onOpenGmail: () -> Unit) {
     Column(Modifier.verticalScroll(rememberScrollState())) {
         Hero("Connect", "Let CallCanary watch out for you", "Give it access to your calls and connect your email.")
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -208,6 +208,12 @@ fun ConnectScreen(screeningOn: Boolean, notificationsOn: Boolean, gmailAccount: 
                 Text(if (screeningOn) "CallCanary checks every call from a number that isn't in your contacts and stops scam calls before your phone rings."
                     else "Allow CallCanary to screen your calls. Android will ask you to set it as your caller ID & spam app.", color = CC.Muted)
                 if (!screeningOn) BigButton("Allow access to calls", onAllowCalls, color = CC.Lamp, textColor = CC.Coal)
+            }
+            Section {
+                ConnectHeader("Texts & emails", messagesOn)
+                Text(if (messagesOn) "CallCanary checks every new text and email the moment it arrives, on this phone, and warns you about scams."
+                    else "Let CallCanary read new message notifications (Messages, Gmail, Outlook, WhatsApp) so it can warn you about scam texts and emails right away. Nothing is uploaded.", color = CC.Muted)
+                if (!messagesOn) BigButton("Allow access to messages", onAllowMessages, color = CC.Lamp, textColor = CC.Coal)
             }
             Section {
                 ConnectHeader("Gmail", gmailAccount != null)

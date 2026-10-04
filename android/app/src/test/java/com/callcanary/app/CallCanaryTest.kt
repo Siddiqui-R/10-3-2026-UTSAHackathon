@@ -2,6 +2,7 @@ package com.callcanary.app
 
 import com.callcanary.app.data.CheckApi
 import com.callcanary.app.data.Decision
+import com.callcanary.app.data.LinkCheck
 import com.callcanary.app.data.PhoneNumbers
 import com.callcanary.app.data.ReportedNumbers
 import com.callcanary.app.data.ScamSignals
@@ -84,5 +85,23 @@ class CallCanaryTest {
         // Negated: "I will never ask for your password".
         assertTrue(ScamSignals.score("we will never ask you to give us your password").score < ScamSignals.THRESHOLD)
         assertEquals(100, ScamSignals.score("warrant arrest gift card numbers wire transfer bitcoin atm anydesk read me the code").score)
+    }
+
+    @Test fun checksLinksInMessagesLikeTheWebsite() {
+        assertEquals("microsoft", LinkCheck.lookalikeBrand("rnicrosoft.com"))
+        assertEquals("paypal", LinkCheck.lookalikeBrand("paypa1-secure.ru"))
+        assertNull(LinkCheck.lookalikeBrand("microsoft.com"))
+        assertNull(LinkCheck.lookalikeBrand("applebees.com"))
+        assertNull(LinkCheck.lookalikeBrand("ups.com"))
+        assertEquals(setOf("usps-track.xyz/pay", "https://bit.ly/3abc"), LinkCheck.extract("Pay at usps-track.xyz/pay. Or https://bit.ly/3abc, thanks").toSet())
+        assertEquals("malicious", LinkCheck.analyze("https://paypal.com@evil.example/login").verdict)
+        assertEquals("suspicious", LinkCheck.analyze("http://192.168.4.20/login").verdict)
+        assertEquals("safe", LinkCheck.analyze("https://www.chase.com/personal").verdict)
+
+        val scam = LinkCheck.message("Chase alert: your account is locked. Verify at chase-secure-login.top/verify")
+        assertEquals("scam", scam.level); assertTrue(scam.reasons.first().contains("pretends to be Chase"))
+        assertEquals("scam", LinkCheck.message("IRS notice: pay with gift cards today or a warrant will be issued").level)
+        assertEquals("safe", LinkCheck.message("Hey it's Sam, dinner at 7? Here's the place: www.yelp.com/biz/la-gloria").level)
+        assertEquals("suspicious", LinkCheck.message("Your order shipped: https://tinyurl.com/abc123").level)
     }
 }

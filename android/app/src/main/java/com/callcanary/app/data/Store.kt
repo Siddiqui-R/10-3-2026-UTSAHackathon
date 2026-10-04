@@ -21,6 +21,10 @@ class Store(context: Context) {
     var blockHidden: Boolean
         get() = prefs.getBoolean("blockHidden", false)
         set(value) = prefs.edit().putBoolean("blockHidden", value).apply()
+    /** Check new texts and emails as they arrive (once notification access is allowed). */
+    var scanMessages: Boolean
+        get() = prefs.getBoolean("scanMessages", true)
+        set(value) = prefs.edit().putBoolean("scanMessages", value).apply()
     /** Offer to listen when an unknown number calls. */
     var offerListening: Boolean
         get() = prefs.getBoolean("offerListening", true)

@@ -12,7 +12,9 @@ A native Android app (Kotlin, Jetpack Compose) that brings CallCanary's protecti
 - **Checks links, texts and emails.** Share anything to CallCanary, select text and tap *Check with CallCanary*, or paste it in the Check tab. It's sent to the website's checker (`/api/analyze-email`): real link checks (look-alike domains like rnicrosoft.com, mismatched links, risky endings, shorteners) plus the AI for typos, fake senders and pressure tricks.
 - **Block list, activity and settings:** add or remove numbers; see recent blocked/allowed calls and checks; choose reject vs silence, whether to block FTC-reported numbers, and whether to block hidden numbers.
 
-What it can't do: Android doesn't let third-party apps hear call audio, so in-call listening stays on the website (with the call on speaker, ideally on a second device).
+- **Live call protection.** Android doesn't let apps tap call audio, so CallCanary listens the honest way: put the call on speaker and tap *Protect a call I'm on* (or the *Protect this call* notification that appears when an unknown number calls). Speech is turned into text **on the phone** with [Vosk](https://alphacephei.com/vosk/) (open source; the 40 MB English model downloads once, then it works offline) and scored with the website's scam phrases. On a scam: a red full-screen alert, a loud notification, vibration and, if you like, a spoken warning; *Hang up & block* ends the call and blocks the number. It stops by itself when the call ends.
+- **Call recordings (optional, off by default).** Turn on *Save a recording of the call* and each protected call is kept on the phone as a WAV with a written transcript and the scam signals, under *Saved calls*. Recording laws differ by state: tell the other person you're recording.
+- **Scam texts and emails, as they arrive.** Allow *Texts & emails* on the Connect tab (Android's notification access) and CallCanary checks each new message from Messages, Gmail, Outlook, WhatsApp and others on the phone: look-alike sites (rnicrosoft.com, chase-secure-login.top), "@" tricks, shorteners, scam endings and scam phrases. A scam gets a warning notification; *See why* runs the full check with the AI. Android 15 hides one-time-code messages from apps, so those aren't checked.
 
 ## Demo mode (Demo tab)
 
@@ -28,9 +30,30 @@ For presentations: **Play full tour** runs seven full-screen scenes in about two
 
 The scenes are scripted and work offline, with the voices bundled in res/raw, so a presentation never depends on the network. The numbers they block really appear in the Blocked tab and Recent activity; clear them in Blocked and Settings after a demo. Use the top-right buttons to skip a scene or close the tour.
 
+## Testing without a real phone line
+
+The emulator can fake calls and texts, so nothing needs a real account:
+
+```bash
+adb shell cmd notification allow_listener com.callcanary.app/com.callcanary.app.messages.MessageWatcher
+adb emu sms send 8885550166 "Chase alert: your account is locked. Verify at chase-secure-login.top/verify"
+adb emu gsm call 4155550142        # unknown caller: the "Protect this call" notification appears
+```
+
+On the emulator, Android 15 hides all message text from notification listeners. Allow it once (then toggle access off and on):
+`adb shell appops set com.callcanary.app RECEIVE_SENSITIVE_NOTIFICATIONS allow`.
+
+To test live listening with a recorded scam call instead of a microphone (debug builds only), drop 16 kHz mono PCM in the app's files; it plays once, at real-time speed, through the same recognizer:
+
+```bash
+ffmpeg -i ../public/demo/live-call.mp3 -ar 16000 -ac 1 -f s16le live-call.pcm
+adb push live-call.pcm /data/local/tmp/ && adb shell run-as com.callcanary.app cp /data/local/tmp/live-call.pcm files/test-call.pcm
+# then Home → Protect a call I'm on → Start listening
+```
+
 ## Build
 
-Requirements: JDK 17 or 21 and the Android SDK (platform 35, build tools 35). Put the SDK path in `local.properties` (`sdk.dir=…`).
+Requirements: JDK 17 or 21 (not newer: Gradle 8.11 can't run on JDK 24; Android Studio's bundled JDK works) and the Android SDK (platform 35, build tools 35). Put the SDK path in `local.properties` (`sdk.dir=…`).
 
 ```bash
 ./gradlew testDebugUnitTest   # unit tests: numbers, screening rules, FTC list, checker parsing

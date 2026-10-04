@@ -90,6 +90,23 @@ object Notifications {
         runCatching { NotificationManagerCompat.from(context).notify(ALERT_ID, notification) }
     }
 
+    /** A text or email that looks like a scam; "See why" opens the full check with the message filled in. */
+    fun scamMessage(context: Context, app: String, from: String, text: String, scam: Boolean, summary: String) {
+        if (!allowed(context)) return
+        ensureChannel(context)
+        val check = Intent(context, CheckActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, text).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val open = PendingIntent.getActivity(context, text.hashCode(), check, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val title = if (scam) "Scam warning: $app message from $from" else "Be careful: $app message from $from"
+        val body = "$summary Don't tap its links or reply."
+        val notification = NotificationCompat.Builder(context, ALERTS)
+            .setSmallIcon(R.drawable.ic_shield).setContentTitle(title).setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(open).addAction(0, "See why", open).setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(text.hashCode(), notification) }
+    }
+
     private const val OFFER_ID = 7002
     private const val ALERT_ID = 7003
 }

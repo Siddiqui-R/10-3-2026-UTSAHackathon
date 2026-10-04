@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private var refresh by mutableIntStateOf(0)
     private var screeningOn by mutableStateOf(false)
     private var notificationsOn by mutableStateOf(false)
+    private var messagesOn by mutableStateOf(false)
     private var reported by mutableStateOf<ReportedNumbers?>(null)
     private var gmailAccount by mutableStateOf<String?>(null)
     private lateinit var store: Store
@@ -97,7 +98,8 @@ class MainActivity : ComponentActivity() {
                     androidx.compose.foundation.layout.Box(modifier) {
                         when (tab) {
                             0 -> HomeScreen(screeningOn, notificationsOn, store, refresh, onTurnOn = ::requestScreening, onNotifications = ::requestNotifications, onCheck = { startActivity(Intent(this@MainActivity, CheckActivity::class.java)) })
-                            1 -> ConnectScreen(screeningOn, notificationsOn, gmailAccount, onAllowCalls = ::requestScreening, onNotifications = ::requestNotifications,
+                            1 -> ConnectScreen(screeningOn, notificationsOn, messagesOn, gmailAccount, onAllowCalls = ::requestScreening, onNotifications = ::requestNotifications,
+                                onAllowMessages = { startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
                                 onConnectGmail = ::connectGmail, onDisconnectGmail = { store.gmailAccount = null; gmailAccount = null }, onOpenGmail = ::openGmail)
                             2 -> BlockedScreen(store, refresh) { refresh++ }
                             3 -> DemoTourScreen { demo = it }
@@ -113,6 +115,7 @@ class MainActivity : ComponentActivity() {
 
     private fun updateStatus() {
         screeningOn = getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        messagesOn = com.callcanary.app.messages.MessageWatcher.enabled(this)
         notificationsOn = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         refresh++
     }
