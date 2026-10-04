@@ -46,6 +46,8 @@ class LiveCallService : Service() {
         val downloadProgress: Float = 0f,
         val recording: File? = null,
         val error: String? = null,
+        /** The website AI's latest read of the call, when online and allowed. */
+        val ai: com.callcanary.app.data.CheckApi.CallVerdict? = null,
         /** Shown after "Block": Android may not let CallCanary end the call itself. */
         val note: String? = null,
     )
@@ -57,6 +59,9 @@ class LiveCallService : Service() {
     private var tts: TextToSpeech? = null
     private var callWatcher: TelephonyCallback? = null
     private var alerted = false
+    @Volatile private var aiBusy = false
+    private var aiAt = 0L
+    private var aiWords = 0
     private lateinit var store: Store
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -83,7 +88,7 @@ class LiveCallService : Service() {
         }
         Notifications.ensureChannel(this)
         startForeground(NOTIFY_ID, ongoing("Getting ready to listen…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-        alerted = false
+        alerted = false; aiBusy = false; aiAt = 0L; aiWords = 0
         _state.value = State(phase = Phase.Preparing, number = PhoneNumbers.normalizeUs(number) ?: number)
         if (store.speakWarnings) tts = TextToSpeech(this) { status -> if (status == TextToSpeech.SUCCESS) tts?.language = Locale.US }
         watchForCallEnd()
@@ -118,11 +123,32 @@ class LiveCallService : Service() {
         }
         val s = _state.value
         if (!alerted && s.score >= ScamSignals.THRESHOLD) { alerted = true; raiseAlert(s) }
+        if (finalText.isNotBlank()) askAi(s.transcript)
     }
 
-    private fun raiseAlert(s: State) {
+    /**
+     * A second opinion from the website's AI, which judges who is asking whom to do what (phrases alone can miss a new
+     * script). At most every 12 seconds, only when new words arrived. It can raise the alarm but never lowers one.
+     */
+    private fun askAi(transcript: String) {
+        val words = transcript.split(' ').size
+        val now = System.currentTimeMillis()
+        if (!store.aiSecondOpinion || aiBusy || words < 12 || words <= aiWords || now - aiAt < 12_000) return
+        aiBusy = true; aiAt = now; aiWords = words
+        Thread({
+            try {
+                val verdict = com.callcanary.app.data.CheckApi.analyzeCall(transcript) ?: return@Thread
+                val phase = _state.value.phase
+                if (phase != Phase.Listening && phase != Phase.Alert) return@Thread
+                _state.update { it.copy(ai = verdict) }
+                if (verdict.level == "scam" && !alerted) { alerted = true; raiseAlert(_state.value, verdict.reasons.firstOrNull()) }
+            } finally { aiBusy = false }
+        }, "LiveCallAi").start()
+    }
+
+    private fun raiseAlert(s: State, aiReason: String? = null) {
         _state.update { it.copy(phase = Phase.Alert) }
-        val reasons = s.signals.take(2).joinToString(" and ") { it.label.lowercase() }
+        val reasons = aiReason?.trimEnd('.')?.replaceFirstChar { it.lowercase() } ?: s.signals.take(2).joinToString(" and ") { it.label.lowercase() }
         getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 200, 800), -1))
         Notifications.scamAlert(this, s.number?.let { PhoneNumbers.format(it) }, reasons)
         if (store.speakWarnings) tts?.speak("CallCanary warning. This sounds like a scam: $reasons. Do not send money or share any codes. You can hang up.",

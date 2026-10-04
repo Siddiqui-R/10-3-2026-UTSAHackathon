@@ -17,11 +17,18 @@ android {
         versionName = "1.0"
         // The website's checking service (email, link and text analysis).
         buildConfigField("String", "API_BASE", "\"https://10-3-2026-utsahackathon.vercel.app\"")
+        // Phones are ARM; x86_64 covers current emulators. 32-bit x86 (old emulators only) would add 10 MB of speech engine.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Shrinking drops unused code (most of the extended icon set): about 50 MB smaller.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Signed with the debug key so the APK can be sideloaded for demos; use a real key before any store release.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

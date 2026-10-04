@@ -291,6 +291,7 @@ fun SettingsScreen(store: Store, reported: ReportedNumbers?, refresh: Int, onCha
                 Toggle("Silence instead of rejecting", "The call goes quietly to voicemail instead of being hung up.", store.silenceOnly) { store.silenceOnly = it; onChanged() }
                 Toggle("Block hidden numbers", "Stop calls that hide their number.", store.blockHidden) { store.blockHidden = it; onChanged() }
                 Toggle("Offer to listen to unknown callers", "When a number that isn't blocked calls, a notification lets you turn on live protection.", store.offerListening) { store.offerListening = it; onChanged() }
+                Toggle("AI second opinion during calls", "When online, sends the words of a protected call (never the audio) to CallCanary's AI, which can catch scams the phrase list misses.", store.aiSecondOpinion) { store.aiSecondOpinion = it; onChanged() }
                 Toggle("Say warnings out loud", "During a call on speaker, CallCanary says the scam warning so you can't miss it. The caller hears it too.", store.speakWarnings) { store.speakWarnings = it; onChanged() }
                 Toggle("Save call recordings", "Keeps a recording and transcript of protected calls on this phone only. Tell the other person you're recording.", store.recordCalls) { store.recordCalls = it; onChanged() }
             }

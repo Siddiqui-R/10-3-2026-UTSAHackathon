@@ -110,7 +110,7 @@ class ListenActivity : ComponentActivity() {
         }
         val subtitle = when (state.phase) {
             LiveCallService.Phase.Preparing -> if (state.downloadProgress > 0f) "Downloading the speech model once (about 40 MB). After this it works offline." else "Loading the speech model…"
-            LiveCallService.Phase.Listening -> "Keep the call on speaker. CallCanary listens on this phone; nothing is uploaded."
+            LiveCallService.Phase.Listening -> "Keep the call on speaker. CallCanary listens on this phone; the audio never leaves it."
             LiveCallService.Phase.Alert -> "Don't send money, buy gift cards or read any code. Real banks and agencies never ask for that."
             else -> state.note ?: state.error ?: "Put the call on speaker and tap Start. CallCanary listens for scam tricks and warns you right away."
         }
@@ -150,6 +150,15 @@ class ListenActivity : ComponentActivity() {
             val danger = state.score >= ScamSignals.THRESHOLD
             Text("Scam score: ${state.score}", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = if (danger) CC.Danger else CC.Ink)
             LinearProgressIndicator(progress = { state.score / 100f }, modifier = Modifier.fillMaxWidth().height(12.dp), color = if (danger) CC.Danger else CC.Pine)
+            state.ai?.let { ai ->
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = when (ai.level) { "scam" -> CC.DangerSoft; "suspicious" -> CC.WarnSoft; else -> CC.SafeSoft })) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("AI SECOND OPINION: ${when (ai.level) { "scam" -> "SCAM"; "suspicious" -> "BE CAREFUL"; else -> "SOUNDS NORMAL SO FAR" }}",
+                            fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = when (ai.level) { "scam" -> CC.Danger; "suspicious" -> CC.Warn; else -> CC.Safe })
+                        ai.reasons.take(3).forEach { Text(it, fontSize = 17.sp) }
+                    }
+                }
+            }
             state.signals.forEach { s ->
                 Text("⚠ ${s.label}: “${s.phrase}”", color = if (s.weight >= 25) CC.Danger else CC.Warn, fontWeight = FontWeight.Bold)
             }

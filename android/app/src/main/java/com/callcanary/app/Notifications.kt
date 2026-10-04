@@ -97,7 +97,7 @@ object Notifications {
         val check = Intent(context, CheckActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_TEXT, text).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val open = PendingIntent.getActivity(context, text.hashCode(), check, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val title = if (scam) "Scam warning: $app message from $from" else "Be careful: $app message from $from"
+        val title = if (scam) "Scam warning in $app: $from" else "Be careful, $app: $from"
         val body = "$summary Don't tap its links or reply."
         val notification = NotificationCompat.Builder(context, ALERTS)
             .setSmallIcon(R.drawable.ic_shield).setContentTitle(title).setContentText(body)

@@ -104,4 +104,12 @@ class CallCanaryTest {
         assertEquals("safe", LinkCheck.message("Hey it's Sam, dinner at 7? Here's the place: www.yelp.com/biz/la-gloria").level)
         assertEquals("suspicious", LinkCheck.message("Your order shipped: https://tinyurl.com/abc123").level)
     }
+
+    @Test fun readsTheAiCallVerdictAndNeverInventsSafe() {
+        val scam = CheckApi.parseCall(JSONObject("""{"risk_score":98,"level":"scam","reasons":["They ask for your card number."]}"""))
+        assertEquals("scam", scam?.level); assertEquals(98, scam?.riskScore); assertEquals("They ask for your card number.", scam?.reasons?.first())
+        // A broken or missing verdict is "no opinion", never "safe".
+        assertNull(CheckApi.parseCall(JSONObject("""{"error":"busy"}""")))
+        assertNull(CheckApi.parseCall(JSONObject("""{"level":"probably fine"}""")))
+    }
 }

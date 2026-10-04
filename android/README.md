@@ -12,7 +12,7 @@ A native Android app (Kotlin, Jetpack Compose) that brings CallCanary's protecti
 - **Checks links, texts and emails.** Share anything to CallCanary, select text and tap *Check with CallCanary*, or paste it in the Check tab. It's sent to the website's checker (`/api/analyze-email`): real link checks (look-alike domains like rnicrosoft.com, mismatched links, risky endings, shorteners) plus the AI for typos, fake senders and pressure tricks.
 - **Block list, activity and settings:** add or remove numbers; see recent blocked/allowed calls and checks; choose reject vs silence, whether to block FTC-reported numbers, and whether to block hidden numbers.
 
-- **Live call protection.** Android doesn't let apps tap call audio, so CallCanary listens the honest way: put the call on speaker and tap *Protect a call I'm on* (or the *Protect this call* notification that appears when an unknown number calls). Speech is turned into text **on the phone** with [Vosk](https://alphacephei.com/vosk/) (open source; the 40 MB English model downloads once, then it works offline) and scored with the website's scam phrases. On a scam: a red full-screen alert, a loud notification, vibration and, if you like, a spoken warning; *Hang up & block* ends the call and blocks the number. It stops by itself when the call ends.
+- **Live call protection.** Android doesn't let apps tap call audio, so CallCanary listens the honest way: put the call on speaker and tap *Protect a call I'm on* (or the *Protect this call* notification that appears when an unknown number calls). Speech is turned into text **on the phone** with [Vosk](https://alphacephei.com/vosk/) (open source; the 40 MB English model downloads once, then it works offline) and scored with the website's scam phrases. On a scam: a red full-screen alert, a loud notification, vibration and, if you like, a spoken warning; *Hang up & block* ends the call and blocks the number. It stops by itself when the call ends. When online, the words (never the audio) also go to the website's AI for a **second opinion**, which catches scams the phrase list misses (for example a polite "Medicare card" call asking for your card number and birthday). The AI can raise the alarm but never cancels one; turn it off in Settings. Android 10+ only lets the phone app end calls, so *Block & hang up* blocks the number and, if Android refuses to hang up, tells you to press the red button.
 - **Call recordings (optional, off by default).** Turn on *Save a recording of the call* and each protected call is kept on the phone as a WAV with a written transcript and the scam signals, under *Saved calls*. Recording laws differ by state: tell the other person you're recording.
 - **Scam texts and emails, as they arrive.** Allow *Texts & emails* on the Connect tab (Android's notification access) and CallCanary checks each new message from Messages, Gmail, Outlook, WhatsApp and others on the phone: look-alike sites (rnicrosoft.com, chase-secure-login.top), "@" tricks, shorteners, scam endings and scam phrases. A scam gets a warning notification; *See why* runs the full check with the AI. Android 15 hides one-time-code messages from apps, so those aren't checked.
 
@@ -40,6 +40,13 @@ adb emu sms send 8885550166 "Chase alert: your account is locked. Verify at chas
 adb emu gsm call 4155550142        # unknown caller: the "Protect this call" notification appears
 ```
 
+Gmail's notification layouts (one email, or an inbox digest) can be tested without an account; debug builds also check notifications posted by `adb`:
+
+```bash
+adb shell "cmd notification post -S bigtext -t 'Microsoft account team' t1 'Review activity at https://rnicrosoft-account.com/verify'"
+adb shell "cmd notification post -S inbox --line 'Netflix: payment declined, update at netflix-billing-help.xyz' --line 'Grandma: see you Sunday' -t '2 new emails' t2 'you@gmail.com'"
+```
+
 On the emulator, Android 15 hides all message text from notification listeners. Allow it once (then toggle access off and on):
 `adb shell appops set com.callcanary.app RECEIVE_SENSITIVE_NOTIFICATIONS allow`.
 
@@ -58,6 +65,7 @@ Requirements: JDK 17 or 21 (not newer: Gradle 8.11 can't run on JDK 24; Android 
 ```bash
 ./gradlew testDebugUnitTest   # unit tests: numbers, screening rules, FTC list, checker parsing
 ./gradlew assembleDebug       # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease     # → app/build/outputs/apk/release/app-release.apk (shrunk, about 34 MB; signed with the debug key for sideloading)
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 

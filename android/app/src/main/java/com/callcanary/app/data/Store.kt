@@ -29,6 +29,10 @@ class Store(context: Context) {
     var offerListening: Boolean
         get() = prefs.getBoolean("offerListening", true)
         set(value) = prefs.edit().putBoolean("offerListening", value).apply()
+    /** During a protected call, send the words (never the audio) to CallCanary's AI for a second opinion when online. */
+    var aiSecondOpinion: Boolean
+        get() = prefs.getBoolean("aiSecondOpinion", true)
+        set(value) = prefs.edit().putBoolean("aiSecondOpinion", value).apply()
     /** Say the scam warning out loud during a call (the caller hears it too, on speaker). */
     var speakWarnings: Boolean
         get() = prefs.getBoolean("speakWarnings", true)

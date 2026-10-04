@@ -36,12 +36,13 @@ class MessageWatcher : NotificationListenerService() {
         if (verdict.level == "safe") return
         val app = appName(sbn.packageName)
         val summary = verdict.reasons.take(2).joinToString(" ").ifBlank { "It uses tricks scammers use." }
-        store.addEvent("message", "${if (verdict.level == "scam") "Scam" else "Suspicious"} $app message from $from", summary, blocked = verdict.level == "scam")
+        store.addEvent("message", "${if (verdict.level == "scam") "Scam" else "Suspicious"} message in $app: $from", summary, blocked = verdict.level == "scam")
         Notifications.scamMessage(this, app, from, text, verdict.level == "scam", summary)
     }
 
+    // Debug builds also check notifications posted with `adb shell cmd notification post`, to test Gmail-style layouts.
     private fun watches(pkg: String, n: Notification) =
-        pkg in APPS || n.category == Notification.CATEGORY_MESSAGE || n.category == Notification.CATEGORY_EMAIL
+        pkg in APPS || (com.callcanary.app.BuildConfig.DEBUG && pkg == "com.android.shell") || n.category == Notification.CATEGORY_MESSAGE || n.category == Notification.CATEGORY_EMAIL
 
     /** Sender and the full text the notification shows, including conversation-style and inbox-style notifications. */
     private fun content(n: Notification): Pair<String, String>? {

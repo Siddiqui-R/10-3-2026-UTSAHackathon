@@ -35,6 +35,30 @@ object CheckApi {
         } finally { connection.disconnect() }
     }
 
+    /** The website's AI verdict on a call transcript (/api/analyze). */
+    data class CallVerdict(val level: String, val riskScore: Int, val reasons: List<String>)
+
+    /** Blocking: call off the main thread. Null when offline or the AI couldn't decide, so nothing is ever called safe by mistake. */
+    fun analyzeCall(transcript: String): CallVerdict? {
+        val connection = (URL("${BuildConfig.API_BASE}/api/analyze").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"; doOutput = true; connectTimeout = 8_000; readTimeout = 45_000
+            setRequestProperty("Content-Type", "application/json")
+        }
+        return try {
+            connection.outputStream.use { it.write(JSONObject().put("transcript", transcript.takeLast(29_000)).toString().toByteArray()) }
+            if (connection.responseCode !in 200..299) return null
+            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            parseCall(json)
+        } catch (e: Exception) { null } finally { connection.disconnect() }
+    }
+
+    fun parseCall(json: JSONObject): CallVerdict? {
+        val level = json.optString("level")
+        if (level !in setOf("safe", "suspicious", "scam")) return null
+        val reasons = json.optJSONArray("reasons")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty()
+        return CallVerdict(level, json.optInt("risk_score", 0), reasons)
+    }
+
     fun parse(json: JSONObject): Result {
         fun JSONArray?.objects() = if (this == null) emptyList() else List(length()) { getJSONObject(it) }
         fun JSONArray?.strings() = if (this == null) emptyList() else List(length()) { getString(it) }
