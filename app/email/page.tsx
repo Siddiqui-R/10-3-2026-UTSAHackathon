@@ -1,6 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
-import { AlertTriangle, Link2, Mail, Search } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { EnvelopeSimple, LinkSimple, MagnifyingGlass, PlayCircle, Warning } from "@phosphor-icons/react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import TopBar from "@/components/TopBar";
 import Mascot from "@/components/Mascot";
 import EmailResultView from "@/components/EmailResultView";
@@ -41,30 +48,40 @@ export default function EmailCheck() {
   function reset() { request.current?.abort(); setResult(null); setText(""); setError(""); setBusy(false); }
   function demo() { setMode("email"); setText(DEMO_PHISHING_EMAIL); void check(DEMO_PHISHING_EMAIL); }
   const noun = mode === "email" ? "email" : "link";
-  return <main className="app-shell">
+  return <main className="min-h-dvh">
     <TopBar active="email" />
-    <section className="home-content email-content">
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
       {result ? <EmailResultView result={result} onReset={reset} /> : <>
-        <div className="intro-copy"><p className="eyebrow">Got a strange email or text?</p>
-          <h1>Check it before you click.</h1>
-          <p className="intro-subtitle">Paste it here. CallCanary checks where every link really goes, looks for spelling mistakes, and spots fake senders.</p></div>
-        <div className="mode-switch" role="radiogroup" aria-label="What do you want to check?">
-          <button role="radio" aria-checked={mode === "email"} className={mode === "email" ? "mode-on" : ""} onClick={() => setMode("email")}><Mail size={24} />A whole email</button>
-          <button role="radio" aria-checked={mode === "link"} className={mode === "link" ? "mode-on" : ""} onClick={() => setMode("link")}><Link2 size={24} />Just a link</button>
+        <header className="grid gap-2 text-center">
+          <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">Got a strange email or text?</p>
+          <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">Check it before you click.</h1>
+          <p className="text-pretty text-xl text-muted-foreground">Paste it here. CallCanary checks where every link really goes, looks for spelling mistakes, and spots fake senders.</p>
+        </header>
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5" role="radiogroup" aria-label="What do you want to check?">
+          {([["email", "A whole email", EnvelopeSimple], ["link", "Just a link", LinkSimple]] as const).map(([id, label, Icon]) =>
+            <button key={id} role="radio" aria-checked={mode === id} onClick={() => setMode(id)}
+              className={cn("relative flex min-h-16 items-center justify-center gap-2 rounded-xl text-xl font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring", mode === id ? "text-[hsl(152_71%_15%)]" : "text-muted-foreground")}>
+              {mode === id && <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-xl bg-card shadow" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
+              <span className="relative flex items-center gap-2"><Icon size={26} weight={mode === id ? "fill" : "regular"} aria-hidden="true" />{label}</span>
+            </button>)}
         </div>
-        <form className="email-form" onSubmit={event => { event.preventDefault(); void check(); }}>
-          <label htmlFor="email-input">{mode === "email" ? "Paste a suspicious email here" : "Paste a suspicious link here"}</label>
-          {mode === "email"
-            ? <textarea id="email-input" value={text} onChange={event => setText(event.target.value)} rows={10} maxLength={50_000} placeholder="Copy the whole email, including who it's from, and paste it here." />
-            : <input id="email-input" value={text} onChange={event => setText(event.target.value)} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="e.g. paypa1-secure.ru/verify" />}
-          <p className="form-hint">Don&apos;t open the link first — just copy it. Long-press it on a phone, or right-click on a computer, and choose “Copy link”.</p>
-          <button className="answer-button" type="submit" disabled={busy || !text.trim()}><Search size={28} />{busy ? `Checking this ${noun}…` : `Check this ${noun}`}</button>
-        </form>
-        {busy && <div className="checking-card" role="status"><Mascot mood="concerned" /><p>CallCanary is reading it carefully…</p></div>}
-        {error && <div className="error-message" role="alert"><AlertTriangle size={24} /><p>{error}</p></div>}
-        {!busy && <button className="demo-link" onClick={demo}>Try a demo phishing email</button>}
-        <p className="footer-note">The email text is sent to Google&apos;s Gemini to check spelling, sender and pressure tricks. Links are checked by CallCanary itself and are never opened.</p>
+        <Card><CardContent className="p-5">
+          <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void check(); }}>
+            <Label htmlFor="email-input" className="font-display text-2xl font-extrabold">{mode === "email" ? "Paste a suspicious email here" : "Paste a suspicious link here"}</Label>
+            {mode === "email"
+              ? <textarea id="email-input" value={text} onChange={event => setText(event.target.value)} rows={10} maxLength={50_000} placeholder="Copy the whole email, including who it's from, and paste it here."
+                  className="min-h-[280px] w-full resize-y rounded-lg border-[3px] border-input bg-card px-4 py-3 text-xl leading-relaxed placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring" />
+              : <Input id="email-input" value={text} onChange={event => setText(event.target.value)} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="e.g. paypa1-secure.ru/verify" />}
+            <p className="text-lg text-muted-foreground">Don&apos;t open the link first, just copy it: long-press it on a phone, or right-click on a computer, and choose “Copy link”.</p>
+            <Button type="submit" variant="canary" size="xl" disabled={busy || !text.trim()}><MagnifyingGlass weight="bold" />{busy ? `Checking this ${noun}…` : `Check this ${noun}`}</Button>
+          </form>
+        </CardContent></Card>
+        <AnimatePresence>{busy && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-2 text-center" role="status">
+          <Mascot mood="concerned" size="md" /><p className="text-2xl font-bold">CallCanary is reading it carefully…</p></motion.div>}</AnimatePresence>
+        {error && <Alert variant="destructive" role="alert"><Warning weight="bold" /><AlertDescription>{error}</AlertDescription></Alert>}
+        {!busy && <Button variant="outline" size="lg" onClick={demo} className="justify-self-center"><PlayCircle weight="fill" className="text-primary" />Try a demo phishing email</Button>}
+        <p className="text-center text-base text-muted-foreground">The email text is sent to Google&apos;s Gemini to check spelling, sender and pressure tricks. Links are checked by CallCanary itself and are never opened.</p>
       </>}
-    </section>
+    </div>
   </main>;
 }

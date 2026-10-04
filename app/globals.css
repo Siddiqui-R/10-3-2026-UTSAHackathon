@@ -4,9 +4,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens for the shadcn/ui components (Direction A: Meadow, refined). HSL triples. */
+@layer base {
+  :root {
+    --background: 80 23% 96%;        /* meadow paper */
+    --foreground: 154 25% 11%;       /* ink */
+    --card: 0 0% 100%;
+    --card-foreground: 154 25% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 154 25% 11%;
+    --primary: 151 64% 22%;          /* pine */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 135 31% 93%;        /* mint */
+    --secondary-foreground: 152 71% 15%;
+    --muted: 100 15% 93%;
+    --muted-foreground: 151 8% 35%;
+    --accent: 47 89% 62%;            /* canary */
+    --accent-foreground: 151 24% 12%;
+    --destructive: 357 80% 39%;      /* alarm */
+    --destructive-foreground: 0 0% 100%;
+    --border: 127 9% 85%;
+    --input: 142 7% 39%;             /* dark enough for older eyes */
+    --ring: 40 77% 51%;              /* amber focus ring */
+    --radius: 1rem;
+    --safe: 145 60% 30%;  --safe-soft: 137 40% 92%;
+    --warn: 40 90% 32%;   --warn-soft: 46 100% 89%;
+    --danger: 357 80% 39%; --danger-soft: 0 100% 97%;
+    --call: 214 27% 20%;  --call-deep: 213 31% 9%; --call-muted: 213 20% 70%;
+  }
+}
+@layer base {
+  body { @apply bg-background text-foreground antialiased; }
+  :focus-visible { outline: 4px solid hsl(var(--ring)); outline-offset: 3px; }
+}
+
 :root {
   --ink: #15231d;
-  --muted: #56655e;
+  --muted-ink: #56655e;
   --green: #145c3a;
   --green-dark: #0b4229;
   --mint: #e6f2e9;
@@ -34,7 +68,7 @@ button { font: inherit; }
 .intro-copy { max-width: 680px; text-align: center; margin-bottom: 25px; }
 .eyebrow { margin: 0 0 8px; color: var(--green); text-transform: uppercase; font-size: 14px; font-weight: 800; }
 .intro-copy h1 { margin: 0; font: 800 clamp(32px, 5vw, 46px)/1.15 'Manrope', sans-serif; }
-.intro-subtitle { margin: 12px 0 0; color: var(--muted); font-size: 19px; line-height: 1.5; }
+.intro-subtitle { margin: 12px 0 0; color: var(--muted-ink); font-size: 19px; line-height: 1.5; }
 .phone-panel { width: min(100%, 470px); padding: 12px 12px 10px; border: 2px solid #263b30; border-radius: 37px; background: #17261f; box-shadow: 0 18px 45px #192e2225; transition: border-color 180ms ease, box-shadow 180ms ease; }
 .phone-panel.is-recording { border-color: #b62128; box-shadow: 0 0 0 5px #b6212824, 0 18px 45px #192e2225; }
 .phone-earpiece { width: 76px; height: 6px; margin: 1px auto 10px; border-radius: 8px; background: #405449; }
@@ -47,7 +81,7 @@ button { font: inherit; }
 .shield-ring > span { position: absolute; top: 48px; left: 54px; display: grid; place-items: center; }
 .phone-copy { min-height: 76px; text-align: center; }
 .phone-copy h2 { margin: 0 0 7px; font: 800 24px 'Manrope', sans-serif; }
-.phone-copy p { max-width: 340px; margin: 0; color: var(--muted); font-size: 17px; line-height: 1.45; }
+.phone-copy p { max-width: 340px; margin: 0; color: var(--muted-ink); font-size: 17px; line-height: 1.45; }
 .result-title { display: flex; justify-content: center; align-items: center; gap: 8px; }
 .result-title.safe { color: #176b40; }
 .result-title.caution { color: #8a5900; }
@@ -126,7 +160,7 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }/* CallCanary: warm yellow identity and large, readable controls. */
-:root { --paper: #fbf8ed; --ink: #17261f; --muted: #46544c; }
+:root { --paper: #fbf8ed; --ink: #17261f; --muted-ink: #46544c; }
 body { font-family: 'DM Sans', Arial, sans-serif; }
 .app-shell { background-image: radial-gradient(#e8dfba 0.8px, transparent 0.8px); }
 .brand-mark { background: #f4cf47; color: #17261f; }
@@ -220,7 +254,7 @@ button:disabled { opacity: .6; cursor: wait; }
 @keyframes mascot-enter { from { opacity: 0; transform: translateY(70px) scale(.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (max-width: 620px) { .monitor-card { padding: 20px; } .mascot { width: 200px; height: 210px; } .connection-pill { font-size: 12px; padding: 7px 10px; } .intro-copy h1 { font-size: 35px; } }
 @media (prefers-reduced-motion: reduce) {
-  .mascot, .mascot img, .mascot-ears, .live-dot { animation: none !important; }
+  .mascot, .mascot img, .canary img, .mascot-ears, .live-dot { animation: none !important; }
   .mascot-ears { transform: none; opacity: 1; }
 }
 /* Degraded-but-running protection and honest safety actions. */
@@ -455,3 +489,8 @@ button:disabled { opacity: .6; cursor: wait; }
 @media (max-width: 620px) {
   .tabs > .tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+/* Room for the fixed bottom tab bar on every page that shows it. */
+body:has(.bottom-nav) { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+/* Canary (new Mascot component): next/image fills the box; mood animations pivot at the feet. */
+.canary img { z-index: 1; transform-origin: 50% 95%; }
+.canary .mascot-badge { width: 22%; height: 22%; min-width: 30px; min-height: 30px; font-size: clamp(16px, 4vw, 28px); }

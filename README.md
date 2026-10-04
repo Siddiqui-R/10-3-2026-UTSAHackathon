@@ -4,6 +4,10 @@ Your canary in the coal mine for phone scams.
 
 Next.js 14, TypeScript and Tailwind app for the Rowdy Hacks SWIVEL Social Engineering Shield track. A masked canary watches for weighted scam phrases, verifies flagged audio with ElevenLabs Scribe and Google Gemini, then pops up and explains a confirmed scam using ElevenLabs speech.
 
+## Interface
+
+Built with [shadcn/ui](https://github.com/shadcn-ui/ui) (Radix UI + Tailwind; components live in `components/ui` and are sized for older users: 56px+ buttons, large type, a thick focus ring), [Motion](https://github.com/motiondivision/motion) for transitions (it follows the device's reduce-motion setting), [Sonner](https://github.com/emilkowalski/sonner) for confirmations, and [Phosphor](https://github.com/phosphor-icons/react) icons. A bottom tab bar (Screen, Listen, Email, Recent) keeps every tool within thumb reach. Screen a caller uses a phone-style call screen: caller ID, the canary in a status ring, and round call buttons.
+
 ## Start locally
 
 1. Run `npm install` (or `npm.cmd install` in Windows PowerShell).

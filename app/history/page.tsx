@@ -1,13 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
+import { CheckCircle, Info, Trash, Warning, XCircle } from "@phosphor-icons/react";
 import TopBar from "@/components/TopBar";
 import Mascot from "@/components/Mascot";
-import { clearHistory, historyEnabled, loadHistory, onHistoryChange, removeHistory, setHistoryEnabled, type HistoryEntry } from "@/lib/history";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { addHistory, clearHistory, historyEnabled, loadHistory, onHistoryChange, removeHistory, setHistoryEnabled, type HistoryEntry } from "@/lib/history";
+import { cn } from "@/lib/utils";
 
-const icon = { scam: "⛔", careful: "⚠️", safe: "✅", info: "ℹ️" } as const;
-const word = { scam: "Scam", careful: "Be careful", safe: "Looked safe", info: "Checked" } as const;
+const look = {
+  scam: { Icon: XCircle, word: "Scam", className: "text-danger", border: "border-danger/60" },
+  careful: { Icon: Warning, word: "Be careful", className: "text-warn", border: "border-warn" },
+  safe: { Icon: CheckCircle, word: "Looked safe", className: "text-safe", border: "border-safe/50" },
+  info: { Icon: Info, word: "Checked", className: "text-muted-foreground", border: "border-border" },
+} as const;
 const tool = { screen: { href: "/screen", label: "Screen a caller" }, number: { href: "/screen", label: "Number check" }, email: { href: "/email", label: "Check an email" }, call: { href: "/", label: "Listen to a call" } } as const;
 
 function dayLabel(date: Date) {
@@ -33,49 +45,66 @@ export default function RecentChecks() {
     return list;
   }, []);
   const scams = (entries || []).filter(entry => entry.verdict === "scam" && !entry.sample).length;
-  return <main className="app-shell">
+  function remove(entry: HistoryEntry) {
+    removeHistory(entry.id);
+    toast("Check removed", { action: { label: "Undo", onClick: () => addHistory({ kind: entry.kind, verdict: entry.verdict, title: entry.title, details: entry.details, sample: entry.sample }) } });
+  }
+  function clearAll() { clearHistory(); setConfirmClear(false); toast.success("History cleared"); }
+  function toggle(next: boolean) {
+    setHistoryEnabled(next);
+    toast(next ? "History is on" : "History is off", { description: next ? "New checks will be saved on this device." : "Saved checks were deleted and nothing new will be saved." });
+  }
+  return <main className="min-h-dvh">
     <TopBar active="history" />
-    <section className="home-content email-content">
-      <div className="intro-copy"><p className="eyebrow">Your recent checks</p>
-        <h1>What CallCanary checked</h1>
-        <p className="intro-subtitle">Saved only on this device. Nothing here is uploaded or shared.</p></div>
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
+      <header className="grid gap-2 text-center">
+        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">Your recent checks</p>
+        <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">What CallCanary checked</h1>
+        <p className="text-pretty text-xl text-muted-foreground">Saved only on this device. Nothing here is uploaded or shared.</p>
+      </header>
 
-      {entries !== null && entries.length > 0 && scams > 0 && <p className="history-summary">CallCanary caught <strong>{scams} {scams === 1 ? "scam" : "scams"}</strong> for you.</p>}
+      {entries !== null && scams > 0 && <motion.p initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+        className="rounded-2xl border-2 border-accent bg-accent/30 p-4 text-center text-2xl">CallCanary caught <strong>{scams} {scams === 1 ? "scam" : "scams"}</strong> for you.</motion.p>}
 
-      {entries !== null && entries.length === 0 && <div className="check-card history-empty">
-        <Mascot mood="sleeping" />
-        <p>{enabled ? "Nothing yet. Calls you screen, numbers and emails you check will show up here." : "History is turned off, so nothing is being saved."}</p>
-        <div className="history-links"><Link href="/screen">Screen a caller</Link><Link href="/email">Check an email</Link></div>
-      </div>}
+      {entries !== null && entries.length === 0 && <Card><CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+        <Mascot mood="sleeping" size="md" />
+        <p className="text-xl">{enabled ? "Nothing yet. Calls you screen, numbers and emails you check will show up here." : "History is turned off, so nothing is being saved."}</p>
+        <div className="flex flex-wrap justify-center gap-3"><Button asChild><Link href="/screen">Screen a caller</Link></Button><Button asChild variant="secondary"><Link href="/email">Check an email</Link></Button></div>
+      </CardContent></Card>}
 
-      {groups.map(group => <section key={group.label} className="history-day" aria-label={group.label}>
-        <h2>{group.label}</h2>
-        <ul className="history-list">{group.items.map(entry => <li key={entry.id} className={`history-item history-${entry.verdict}`}>
-          <span className="history-icon" aria-hidden="true">{icon[entry.verdict]}</span>
-          <div className="history-body">
-            <p className="history-title"><span className="sr-only">{word[entry.verdict]}: </span>{entry.title}</p>
-            {entry.details.map((detail, i) => <p key={i} className="history-detail">{detail}</p>)}
-            <p className="history-meta">
-              {new Date(entry.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · <Link href={tool[entry.kind].href}>{tool[entry.kind].label}</Link>
-              {entry.sample && <span className="history-sample">Sample</span>}
-            </p>
-          </div>
-          <button className="history-remove" aria-label={`Remove: ${entry.title}`} onClick={() => removeHistory(entry.id)}><Trash2 size={22} /></button>
-        </li>)}</ul>
+      {groups.map(group => <section key={group.label} aria-label={group.label} className="grid gap-3">
+        <h2 className="font-display text-2xl font-extrabold">{group.label}</h2>
+        <ul className="grid gap-3">
+          <AnimatePresence initial={false}>{group.items.map(entry => { const l = look[entry.verdict];
+            return <motion.li key={entry.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -40, transition: { duration: 0.2 } }}
+              className={cn("flex items-start gap-3 rounded-2xl border-[3px] bg-card p-4", l.border)}>
+              <l.Icon size={34} weight="fill" className={cn("mt-0.5 shrink-0", l.className)} aria-hidden="true" />
+              <div className="min-w-0 flex-1 break-words">
+                <p className="text-xl font-extrabold leading-snug"><span className="sr-only">{l.word}: </span>{entry.title}</p>
+                {entry.details.map((detail, i) => <p key={i} className="text-lg text-muted-foreground">{detail}</p>)}
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-base text-muted-foreground">
+                  {new Date(entry.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · <Link className="font-bold text-primary underline-offset-4 hover:underline" href={tool[entry.kind].href}>{tool[entry.kind].label}</Link>
+                  {entry.sample && <Badge>Sample</Badge>}
+                </p>
+              </div>
+              <Button variant="outline" size="icon" aria-label={`Remove: ${entry.title}`} onClick={() => remove(entry)}><Trash weight="bold" /></Button>
+            </motion.li>; })}</AnimatePresence>
+        </ul>
       </section>)}
 
-      <div className="check-card history-settings">
-        <label className="history-toggle">
-          <input type="checkbox" checked={enabled} onChange={event => setHistoryEnabled(event.target.checked)} />
-          <span>Keep a history of my checks on this device</span>
-        </label>
-        <p className="form-hint">Turning it off also deletes what&apos;s saved. Only short summaries are kept — never recordings, full call words or email text. At most 50 checks.</p>
+      <Card><CardContent className="grid gap-4 p-5">
+        <div className="flex items-start gap-4">
+          <Switch id="history-on" checked={enabled} onCheckedChange={toggle} className="mt-1" />
+          <Label htmlFor="history-on" className="leading-snug">Keep a history of my checks on this device</Label>
+        </div>
+        <p className="text-lg text-muted-foreground">Turning it off also deletes what&apos;s saved. Only short summaries are kept, never recordings, full call words or email text. At most 50 checks.</p>
         {entries !== null && entries.length > 0 && (confirmClear
-          ? <div className="confirm-box" role="alertdialog" aria-label="Confirm clearing history"><p>Delete all {entries.length} saved checks?</p>
-              <div><button className="big-action action-danger" onClick={() => { clearHistory(); setConfirmClear(false); }}>Yes, delete all</button>
-                <button className="big-action action-plain" onClick={() => setConfirmClear(false)}>Keep them</button></div></div>
-          : <button className="big-action action-report" onClick={() => setConfirmClear(true)}><Trash2 size={24} />Clear all history</button>)}
-      </div>
-    </section>
+          ? <div role="alertdialog" aria-label="Confirm clearing history" className="grid gap-3 rounded-xl border-2 border-danger/50 p-4">
+              <p className="text-xl font-bold">Delete all {entries.length} saved checks?</p>
+              <div className="grid gap-3 sm:grid-cols-2"><Button variant="destructive" size="lg" onClick={clearAll}>Yes, delete all</Button><Button variant="secondary" size="lg" onClick={() => setConfirmClear(false)}>Keep them</Button></div>
+            </div>
+          : <Button variant="outline-danger" size="lg" onClick={() => setConfirmClear(true)}><Trash weight="bold" />Clear all history</Button>)}
+      </CardContent></Card>
+    </div>
   </main>;
 }

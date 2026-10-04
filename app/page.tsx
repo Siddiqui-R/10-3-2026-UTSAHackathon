@@ -1,6 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Headphones, Mic, MicOff, ShieldOff } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { CaretDown, CheckCircle, MagnifyingGlass, Microphone, MicrophoneSlash, PlayCircle, ShieldSlash, SpeakerHigh, Warning } from "@phosphor-icons/react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import type { Analysis } from "@/lib/analysis";
 import { demoTranscripts } from "@/lib/demoTranscripts";
 import { scoreSignals, SIGNAL_THRESHOLD } from "@/lib/scamSignals";
@@ -23,7 +32,6 @@ export default function Home() {
   const [demoSignals, setDemoSignals] = useState<ReturnType<typeof scoreSignals> | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [consented, setConsented] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const startRequest = useRef<AbortController>();
   const speechRequest = useRef<AbortController>();
@@ -116,49 +124,97 @@ export default function Home() {
   if (result?.level === "scam") return <WarningTakeover result={result} audioUrl={audioUrl} audioError={audioError}
     onRetry={() => void prepareWarning(result)} onReset={reset} />;
 
-  return <main className="app-shell">
+  return <main className="min-h-dvh">
     <TopBar active="call">
-      <span className={`connection-pill ${health?.ready ? "connected" : ""}`}>{health === null ? "Checking connections…" : health.ready ? "Providers configured" : "Setup needed"}</span></TopBar>
-    <section className="home-content monitor-content">
-      <div className="intro-copy"><p className="eyebrow">Your canary in the coal mine for phone scams.</p>
-        <h1>A little bird. A big warning.</h1><p className="intro-subtitle">Turn on protection. Put your call on speaker. I&apos;ll listen for trouble.</p></div>
-      {health && !health.ready && <details className="setup-card"><summary>Connect CallCanary to its voice and safety check</summary>
-        <p>Set the missing variables in <code>.env.local</code> and in Vercel, then restart or redeploy.</p>
-        <ul><li>ElevenLabs transcription: {health.transcription ? "SET" : "NOT SET"} — <code>ELEVENLABS_API_KEY</code></li>
-          <li>Gemini scam analysis: {health.analysis ? "SET" : "NOT SET"} — <code>GEMINI_API_KEY</code></li>
-          <li>Mascot voice: {health.voice ? "SET" : "NOT SET"} — <code>ELEVENLABS_VOICE_ID</code> or <code>ELEVENLABS_MASCOT_VOICE_ID</code></li></ul>
-        <p><a href="https://elevenlabs.io/app/developers/api-keys" target="_blank" rel="noreferrer">ElevenLabs API keys</a> · <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noreferrer">Google AI Studio keys</a>. Keep key values out of chat and Git.</p>
-      </details>}
-      <section className={`monitor-card ${active ? "monitor-active" : ""}`} aria-label="Continuous call protection">
-        <div className="monitor-status"><span className={active ? "live-dot" : "off-dot"} />{demoBusy ? "CHECKING EXAMPLE" : session.state.status.toUpperCase()}</div>
-        <Mascot mood={mood} />
-        <div className="mascot-bubble" aria-live="polite"><h2>{mood === "concerned" ? "Hmm… let me check that." : explaining ? "Here's what I heard." : active ? "I've got my ears on." : "Zzz… I'm off duty."}</h2>
-          <p>{demoBusy ? "Gemini is checking the full example." : session.state.message}</p></div>
-        {active && session.state.warning && <div className="protection-warning" role="alert"><AlertTriangle size={26} /><span>{session.state.warning}</span></div>}
-        <RiskMeter score={score} label="Warning-phrase score" signals />
-        <p className="trigger-note">{SIGNAL_THRESHOLD} points starts a closer check. Words alone do not prove a scam.</p>
-        {signals.length > 0 && <ul className="signal-list" aria-label="Weighted warning phrases">{signals.map(signal => <li key={signal.id}><span>{signal.label}<small>“{signal.phrase}”{signal.note === "negated" ? " · said with “not”, counts less" : signal.note === "discussion" ? " · sounds like talk about scams, counts less" : ""}</small></span><strong>+{signal.weight}</strong></li>)}</ul>}
-        {active && session.awake !== "off" && <p className="listening-duration">{session.awake === "held" ? "Your screen will stay on while CallCanary listens." : "Keep your screen on — this browser can't keep it awake for you."}</p>}
-        {active && <p className="listening-duration">Listening for {Math.floor(session.state.seconds / 60)}:{String(session.state.seconds % 60).padStart(2, "0")} · {session.state.mode === "keywords" ? "Phrase-triggered checks" : "20-second audio checks"}</p>}
-        {!active && !demoBusy && <><label className="consent-note"><input type="checkbox" checked={consented} onChange={event => setConsented(event.target.checked)} />
-          <span>Listen while this page is open. Browser speech recognition may send audio to its provider. Flagged clips go to ElevenLabs and words to Google. If browser speech recognition is unavailable, ElevenLabs checks a clip every 20 seconds.</span></label>
-          <button className="answer-button" disabled={!consented || starting} onClick={() => void start()}><Mic size={28} />{starting ? "Connecting…" : "Start protection"}</button></>}
-        {active && <div className="monitor-actions"><button className="hangup-button" onClick={() => session.stop()}><MicOff size={24} />Stop listening</button>
-          <button className="again-button" disabled={session.state.status !== "listening"} onClick={() => void session.checkNow()}>Check now</button></div>}
-        <p className="monitor-limit">Keep this page open and your device awake. Listening pauses for a scam warning.</p>
-      </section>
-      {stoppedUnexpectedly && <div className="protection-stopped" role="alert"><ShieldOff size={32} /><span>Protection is OFF. {session.state.message}</span>
-        <button disabled={!consented || starting} onClick={() => void start()}>Turn back on</button></div>}
-      {error && <div className="error-message" role="alert"><AlertTriangle size={24} /><p>{error}</p></div>}
-      {result && <section className={`result-panel ${result.level === "safe" ? "safe" : "caution"}`} aria-live="polite"><h2>{result.level === "safe" ? "This part of the call looks safe." : "Be careful — this call shows warning signs."}</h2>
-        <RiskMeter score={result.risk_score} label="Verified call risk" /><ul>{result.reasons.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
-        <button className="hear-why" disabled={explaining} onClick={() => void explain(result)}><Headphones size={24} />{explaining ? "CallCanary is speaking…" : "Hear CallCanary explain"}</button></section>}
-      {!active && <details className="demo-panel" open={demoOpen} onToggle={event => setDemoOpen(event.currentTarget.open)}><summary>Try a demo call</summary>
-        <p>See the phrase weights, then let Gemini check the example.</p><div className="demo-buttons">
-          <button disabled={demoBusy || starting} onClick={() => void demo("irs")}>Play IRS scam</button>
-          <button disabled={demoBusy || starting} onClick={() => void demo("romance")}>Play romance scam</button>
-          <button disabled={demoBusy || starting} onClick={() => void demo("phishing")}>Play phishing text</button></div></details>}
-    </section>
-    <footer className="footer-note">CallCanary listens through your microphone, not directly to telephone audio. Use speakerphone.<br />Scams without these phrases can be missed. Tap Check now whenever you are unsure.</footer>
+      <Badge variant={health?.ready ? "safe" : health ? "warn" : "outline"} className="hidden sm:inline-flex">{health === null ? "Checking…" : health.ready ? "Connected" : "Setup needed"}</Badge>
+    </TopBar>
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
+      <header className="grid gap-2 text-center">
+        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">Your canary in the coal mine for phone scams</p>
+        <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">A little bird. A big warning.</h1>
+        <p className="text-pretty text-xl text-muted-foreground">Turn on protection, put your call on speaker, and I&apos;ll listen for trouble.</p>
+      </header>
+
+      {health && !health.ready && <Collapsible asChild><Card className="border-warn bg-warn-soft">
+        <CollapsibleTrigger className="flex min-h-16 w-full items-center gap-3 px-5 text-left text-xl font-extrabold"><Warning size={26} weight="fill" className="text-warn" aria-hidden="true" />Connect CallCanary to its voice and safety check</CollapsibleTrigger>
+        <CollapsibleContent><CardContent className="grid gap-2 text-lg">
+          <p>Set the missing variables in <code>.env.local</code> and in Vercel, then restart or redeploy.</p>
+          <ul className="list-disc pl-6"><li>ElevenLabs transcription: {health.transcription ? "set" : "not set"} (<code>ELEVENLABS_API_KEY</code>)</li>
+            <li>Gemini scam analysis: {health.analysis ? "set" : "not set"} (<code>GEMINI_API_KEY</code>)</li>
+            <li>Mascot voice: {health.voice ? "set" : "not set"} (<code>ELEVENLABS_MASCOT_VOICE_ID</code>)</li></ul>
+        </CardContent></CollapsibleContent>
+      </Card></Collapsible>}
+
+      <Card className={cn("overflow-hidden transition-colors", active && "border-primary ring-4 ring-primary/15")} aria-label="Continuous call protection">
+        <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+          <div className="flex w-full items-center justify-between">
+            <span className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.1em] text-muted-foreground">
+              <span className={cn("relative flex size-3")}>{active && <span className="absolute inline-flex size-full animate-ping rounded-full bg-safe opacity-60 motion-reduce:animate-none" />}<span className={cn("relative inline-flex size-3 rounded-full", active ? "bg-safe" : "bg-muted-foreground")} /></span>
+              {demoBusy ? "Checking example" : session.state.status === "off" ? "Off" : session.state.status}
+            </span>
+            {active && <span className="text-base font-bold tabular-nums text-muted-foreground">{Math.floor(session.state.seconds / 60)}:{String(session.state.seconds % 60).padStart(2, "0")}</span>}
+          </div>
+          <Mascot mood={mood} size="lg" />
+          <div aria-live="polite" className="grid gap-1">
+            <AnimatePresence mode="wait"><motion.h2 key={mood} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}
+              className="font-display text-3xl font-extrabold">{mood === "concerned" ? "Hmm… let me check that." : explaining ? "Here's what I heard." : active ? "I've got my ears on." : "Zzz… I'm off duty."}</motion.h2></AnimatePresence>
+            <p className="text-xl text-muted-foreground">{demoBusy ? "Gemini is checking the full example." : session.state.message}</p>
+          </div>
+          {active && session.state.warning && <Alert variant="warn" role="alert" className="text-left"><Warning weight="fill" /><AlertDescription>{session.state.warning}</AlertDescription></Alert>}
+          <RiskMeter score={score} label="Warning-phrase score" signals />
+          <p className="text-base text-muted-foreground">{SIGNAL_THRESHOLD} points starts a closer check. Words alone don&apos;t prove a scam.</p>
+          {signals.length > 0 && <ul className="grid w-full gap-2" aria-label="Weighted warning phrases">{signals.map((signal, i) => <motion.li key={signal.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.06 * i }}
+            className="flex items-center justify-between gap-3 rounded-xl bg-accent/40 px-4 py-3 text-left">
+            <span className="min-w-0"><strong className="block text-xl">{signal.label}</strong><span className="text-base text-muted-foreground">“{signal.phrase}”{signal.note === "negated" ? " · said with “not”, counts less" : signal.note === "discussion" ? " · sounds like talk about scams, counts less" : ""}</span></span>
+            <strong className="font-display text-2xl tabular-nums text-[hsl(40_90%_28%)]">+{signal.weight}</strong>
+          </motion.li>)}</ul>}
+          {active && <p className="text-base text-muted-foreground">{session.state.mode === "keywords" ? "Phrase-triggered checks" : "20-second audio checks"}{session.awake !== "off" && (session.awake === "held" ? " · Your screen will stay on." : " · Keep your screen on.")}</p>}
+          {!active && !demoBusy && <div className="grid w-full gap-4">
+            <div className="flex items-start gap-4 rounded-xl bg-muted/60 p-4 text-left">
+              <Switch id="consent" checked={consented} onCheckedChange={setConsented} className="mt-1" />
+              <Label htmlFor="consent" className="text-lg font-semibold leading-relaxed">Listen while this page is open. Browser speech recognition may send audio to its provider. Flagged clips go to ElevenLabs and words to Google.</Label>
+            </div>
+            <Button variant="canary" size="xl" disabled={!consented || starting} onClick={() => void start()}><Microphone weight="fill" />{starting ? "Connecting…" : "Start protection"}</Button>
+          </div>}
+          {active && <div className="grid w-full gap-3">
+            <Button variant="destructive" size="xl" onClick={() => session.stop()}><MicrophoneSlash weight="fill" />Stop listening</Button>
+            <Button variant="secondary" size="lg" disabled={session.state.status !== "listening"} onClick={() => void session.checkNow()}><MagnifyingGlass weight="bold" />Check now</Button>
+          </div>}
+          <p className="text-base text-muted-foreground">Keep this page open and your device awake. Listening pauses for a scam warning.</p>
+        </CardContent>
+      </Card>
+
+      <AnimatePresence>{stoppedUnexpectedly && <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+        <Alert variant="stopped" role="alert" className="flex flex-wrap items-center gap-4 [&>svg]:static [&>svg~*]:pl-0">
+          <ShieldSlash weight="fill" /><AlertDescription className="min-w-0 flex-1 text-xl">Protection is OFF. {session.state.message}</AlertDescription>
+          <Button variant="outline" disabled={!consented || starting} onClick={() => void start()}>Turn back on</Button>
+        </Alert></motion.div>}</AnimatePresence>
+      {error && <Alert variant="destructive" role="alert"><Warning weight="bold" /><AlertDescription>{error}</AlertDescription></Alert>}
+
+      <AnimatePresence>{result && <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+        <Card className={result.level === "safe" ? "border-safe/50" : "border-warn"} aria-live="polite">
+          <CardHeader className="pb-3"><CardTitle className="flex items-center gap-3">
+            {result.level === "safe" ? <CheckCircle size={32} weight="fill" className="text-safe" aria-hidden="true" /> : <Warning size={32} weight="fill" className="text-warn" aria-hidden="true" />}
+            {result.level === "safe" ? "This part of the call looks safe." : "Be careful — this call shows warning signs."}</CardTitle></CardHeader>
+          <CardContent className="grid gap-4">
+            <RiskMeter score={result.risk_score} label="Verified call risk" />
+            <ul className="grid gap-2 text-xl">{result.reasons.map((reason, i) => <li key={i} className="flex gap-3"><span aria-hidden="true" className="mt-2.5 size-2 shrink-0 rounded-full bg-foreground/60" />{reason}</li>)}</ul>
+            <Button variant="outline" size="lg" disabled={explaining} onClick={() => void explain(result)}><SpeakerHigh weight="fill" />{explaining ? "CallCanary is speaking…" : "Hear CallCanary explain"}</Button>
+          </CardContent>
+        </Card></motion.div>}</AnimatePresence>
+
+      {!active && <Collapsible asChild><Card className="border-accent bg-[hsl(47_100%_96%)]">
+        <CollapsibleTrigger className="group flex min-h-[72px] w-full items-center justify-between gap-3 rounded-xl px-6 text-left font-display text-2xl font-extrabold">
+          <span className="flex items-center gap-3"><PlayCircle size={30} weight="fill" className="text-[hsl(40_90%_32%)]" aria-hidden="true" />Try a demo call</span>
+          <CaretDown size={26} weight="bold" className="shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+        </CollapsibleTrigger>
+        <CollapsibleContent><CardContent className="grid gap-3">
+          <p className="text-lg text-muted-foreground">See the phrase weights, then let Gemini check the example.</p>
+          {([["irs", "IRS scam"], ["romance", "Romance scam"], ["phishing", "Phishing text"]] as const).map(([id, label]) =>
+            <Button key={id} variant="outline" size="lg" className="justify-start" disabled={demoBusy || starting} onClick={() => void demo(id)}><PlayCircle weight="fill" className="text-primary" />{label}</Button>)}
+        </CardContent></CollapsibleContent>
+      </Card></Collapsible>}
+      <p className="text-center text-base text-muted-foreground">CallCanary listens through your microphone, not directly to the phone line, so use speakerphone. Scams without these phrases can be missed: tap Check now whenever you&apos;re unsure.</p>
+    </div>
   </main>;
 }

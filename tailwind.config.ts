@@ -1,11 +1,37 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 const config: Config = {
-  content: ["./app/**/*.{js,ts,jsx,tsx,mdx}"],
+  content: ["./app/**/*.{js,ts,jsx,tsx,mdx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+        secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
+        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
+        muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+        accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+        card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
+        popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
+        // Verdict colors are separate from the brand accent.
+        safe: { DEFAULT: "hsl(var(--safe))", soft: "hsl(var(--safe-soft))" },
+        warn: { DEFAULT: "hsl(var(--warn))", soft: "hsl(var(--warn-soft))" },
+        danger: { DEFAULT: "hsl(var(--danger))", soft: "hsl(var(--danger-soft))" },
+        call: { DEFAULT: "hsl(var(--call))", deep: "hsl(var(--call-deep))", muted: "hsl(var(--call-muted))" },
+      },
+      borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 4px)", sm: "calc(var(--radius) - 8px)" },
+      fontFamily: {
+        sans: ["var(--font-body)", "DM Sans", "Segoe UI", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "Manrope", "Segoe UI", "system-ui", "sans-serif"],
+      },
+    },
   },
-  plugins: [],
+  plugins: [animate],
 };
 
 export default config;

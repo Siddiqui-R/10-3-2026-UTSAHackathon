@@ -1,9 +1,18 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleSlash, Hash, PhoneIncoming, PhoneOff, Play, RotateCcw, Square, Trash2, UserPlus, Users, Volume2 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
+import { ArrowCounterClockwise, CaretDown, CheckCircle, Hash, Phone, PhoneDisconnect, PhoneIncoming, PlayCircle, Prohibit, SpeakerHigh, Stop, Trash, UserPlus, UsersThree, Warning, XCircle } from "@phosphor-icons/react";
 import TopBar from "@/components/TopBar";
 import Mascot, { type MascotMood } from "@/components/Mascot";
 import SafetyActions from "@/components/SafetyActions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { NumberCheck } from "@/lib/reportedNumbers";
 import type { ScreenLayer, ScreenResult } from "@/lib/screening";
 import { SCREEN_GOODBYE, SCREEN_GREETING } from "@/lib/screening";
@@ -14,18 +23,24 @@ import { formatUsNumber, normalizeUsNumber } from "@/lib/phoneNumber";
 import { DEMO_CONTACTS, SCREEN_DEMOS, type ScreenDemo } from "@/lib/screenDemos";
 import { speakWithDeviceVoice } from "@/lib/deviceVoice";
 import { addHistory } from "@/lib/history";
+import { cn } from "@/lib/utils";
 
 type Stage = "idle" | "greeting" | "recording" | "checking" | "done";
 const MAX_REPLY_MS = 20_000;
 const NO_SPEECH_MS = 8_000;
 const END_SILENCE_MS = 2_500;
 const SPEECH_LEVEL = 0.02;
-const banner = {
-  scam: { className: "verdict-phishing", icon: "⛔" },
-  careful: { className: "verdict-careful", icon: "⚠️" },
-  safe: { className: "verdict-safe", icon: "✅" },
-} as const;
-const layerIcon: Record<ScreenLayer["status"], string> = { flagged: "⛔", clear: "✅", info: "ℹ️", skipped: "—", unavailable: "…", pending: "⏳" };
+// Ring color carries the state before any words are read, like a phone's call screen.
+const ring = { idle: "bg-white/15", greeting: "bg-[#ffcc00]", recording: "bg-[#34c759]", checking: "bg-[#ffcc00]", done: "bg-white/15", scam: "bg-[#ff3b30]", careful: "bg-[#ffcc00]", safe: "bg-[#34c759]" } as const;
+const verdictText = { scam: "text-[#ffb4ae]", careful: "text-[#ffe08a]", safe: "text-[#9ff0b8]" } as const;
+const layerLook: Record<ScreenLayer["status"], { Icon: typeof CheckCircle; className: string; word: string }> = {
+  flagged: { Icon: XCircle, className: "text-danger", word: "Warning" },
+  clear: { Icon: CheckCircle, className: "text-safe", word: "OK" },
+  info: { Icon: Warning, className: "text-warn", word: "Note" },
+  skipped: { Icon: Prohibit, className: "text-muted-foreground", word: "Skipped" },
+  unavailable: { Icon: Prohibit, className: "text-muted-foreground", word: "Unavailable" },
+  pending: { Icon: CaretDown, className: "text-muted-foreground animate-pulse", word: "Checking" },
+};
 
 async function fetchVoice(script: "greeting" | "goodbye") {
   const response = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script }) });
@@ -58,6 +73,7 @@ export default function ScreenCaller() {
   const greetingUrl = useRef<string>();
   const cancel = useRef<() => void>(() => {});
   const stopRecording = useRef<() => void>(() => {});
+  const actionsRef = useRef<HTMLDivElement>(null);
   // Prepare the greeting early so it plays right after the tap (browsers block late autoplay).
   useEffect(() => {
     let alive = true;
@@ -139,6 +155,7 @@ export default function ScreenCaller() {
   // A sample call: the greeting, then the recorded caller out loud, then the same checks as a real call.
   async function runDemo(sample: ScreenDemo) {
     setError(""); setResult(null); setGoodbye("idle"); setDemo(sample); setPhone(sample.phone); setLookup(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
     let stopped = false; let player: HTMLAudioElement | undefined;
     cancel.current = () => { stopped = true; player?.pause(); window.speechSynthesis?.cancel(); };
     setStage("greeting");
@@ -160,138 +177,201 @@ export default function ScreenCaller() {
     await playAudio(url, SCREEN_GOODBYE);
     if (url) URL.revokeObjectURL(url);
     setGoodbye("done");
+    toast.success("CallCanary said goodbye", { description: "Now hang up on your phone." });
   }
-  function reset() { cancel.current(); setStage("idle"); setResult(null); setProgress(null); setError(""); setGoodbye("idle"); setDemo(null); }
+  function reset() { cancel.current(); setStage("idle"); setResult(null); setProgress(null); setError(""); setGoodbye("idle"); setDemo(null); window.scrollTo({ top: 0 }); }
 
   const mood: MascotMood = stage === "greeting" ? "speaking" : stage === "recording" ? "alert" : stage === "checking" ? "concerned"
     : result?.verdict === "scam" ? "warning" : result?.verdict === "careful" ? "concerned" : stage === "done" ? "alert" : "sleeping";
-  const busy = stage === "greeting" || stage === "recording" || stage === "checking";
-  return <main className="app-shell">
-    <TopBar active="screen" />
-    <section className="home-content email-content">
-      {stage !== "done" && <div className="intro-copy"><p className="eyebrow">A call from a number you don&apos;t know?</p>
-        <h1>Let CallCanary answer first.</h1>
-        <p className="intro-subtitle">It asks the caller who they are and why they&apos;re calling, then tells you whether to talk to them.</p></div>}
+  const ringColor = stage === "done" && result ? ring[result.verdict] : ring[stage];
+  const callerDigits = normalizeUsNumber(phone);
+  const callerLine = callerDigits ? formatUsNumber(callerDigits) : "Unknown number";
+  const analysis = { risk_score: 90, level: "scam" as const, scam_type: "other" as const, reasons: [result?.explanation || ""], red_flags: [] };
 
-      {stage === "idle" && <>
-        <div className="check-card screen-number">
-          <label htmlFor="caller-number"><Hash size={22} aria-hidden="true" /> Caller&apos;s number (optional)</label>
-          <input id="caller-number" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={event => { setPhone(event.target.value); setLookup(null); }} placeholder="e.g. (210) 555-0100" />
-          <button className="big-action action-plain" disabled={!phone.trim() || looking} onClick={() => void checkNumber()}>{looking ? "Checking…" : "Check this number"}</button>
-          {lookup && <NumberResult lookup={lookup} />}
+  return <main className="min-h-dvh">
+    <TopBar active="screen" />
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
+      {stage === "idle" && <header className="grid gap-2 text-center">
+        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">A call from a number you don&apos;t know?</p>
+        <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">Let CallCanary answer first.</h1>
+        <p className="text-pretty text-xl text-muted-foreground">It asks who&apos;s calling and why, then tells you whether to talk to them.</p>
+      </header>}
+
+      {/* Direction C: the phone's own call screen. */}
+      <section aria-label="Call screen" className="relative overflow-hidden rounded-[32px] bg-gradient-to-b from-call to-call-deep px-5 pb-7 pt-6 text-center text-white shadow-xl">
+        {demo && <p className="mx-auto mb-3 w-fit rounded-full bg-white/15 px-4 py-1.5 text-base font-bold">Sample call · {demo.label}</p>}
+        <p className="text-base font-bold uppercase tracking-[0.1em] text-call-muted">{stage === "done" ? "Screened call" : stage === "idle" ? "CallCanary" : "Screening"} · {callerLine}</p>
+        <AnimatePresence mode="wait">
+          <motion.div key={stage === "done" ? `done-${result?.verdict}` : stage} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="mt-1 grid gap-1">
+            <h2 className="text-balance font-display text-3xl font-extrabold leading-tight sm:text-4xl" role="status">
+              {stage === "idle" && "Ready when a call comes in"}
+              {stage === "greeting" && "Greeting the caller…"}
+              {stage === "recording" && (heard ? "Listening to the caller…" : "Waiting for the caller…")}
+              {stage === "checking" && "Checking what they said…"}
+              {stage === "done" && result && (result.stated_name ? `“${result.stated_name}”` : result.headline)}
+            </h2>
+            {stage === "done" && result && <p className={cn("text-2xl font-extrabold", verdictText[result.verdict])}>{result.stated_name ? result.headline : ""}</p>}
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="relative mx-auto my-5 grid size-48 place-items-center">
+          {(stage === "recording" || stage === "greeting") && <motion.span aria-hidden="true" className={cn("absolute inset-0 rounded-full", ringColor)}
+            animate={{ scale: [1, 1.12], opacity: [0.5, 0] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }} />}
+          <div className={cn("absolute inset-0 rounded-full p-2 transition-colors duration-500", ringColor)}>
+            <div className="size-full rounded-full bg-call" />
+          </div>
+          <Mascot mood={mood} size="md" className="relative" />
         </div>
-        <div className="check-card">
-          <h3>How it works</h3>
-          <ol className="screen-steps"><li>Answer the call and put it on <strong>speaker</strong>. Don&apos;t say anything yet.</li>
-            <li>Hold your phone near this screen and tap <strong>Answer with CallCanary</strong>.</li>
-            <li>CallCanary greets the caller and listens to their answer.</li></ol>
+
+        {stage === "greeting" && <p className="mx-auto max-w-md text-lg text-white/85">“{SCREEN_GREETING}”</p>}
+        {stage === "recording" && demo && <p className="mx-auto max-w-md text-lg text-white/85">Caller: “{demo.text}”</p>}
+        {stage === "done" && result && <p className="mx-auto max-w-md text-pretty text-xl leading-relaxed text-white/90">{result.explanation}</p>}
+        {stage === "idle" && <p className="mx-auto max-w-md text-lg text-white/80">Answer on speaker, don&apos;t say anything, and hold your phone near this screen.</p>}
+
+        <div className="mt-7 flex items-start justify-center gap-10">
+          {stage === "idle" && <RoundButton label="Answer with CallCanary" variant="call-go" onClick={() => void answer()}><PhoneIncoming weight="fill" /></RoundButton>}
+          {stage === "recording" && !demo && <RoundButton label="They're done" variant="call-muted" onClick={() => stopRecording.current()}><Stop weight="fill" /></RoundButton>}
+          {(stage === "greeting" || stage === "recording" || stage === "checking") && <RoundButton label="Cancel" variant="call-stop" onClick={reset}><PhoneDisconnect weight="fill" /></RoundButton>}
+          {stage === "done" && result && result.verdict !== "safe" && <>
+            <RoundButton label={goodbye === "playing" ? "Saying goodbye…" : goodbye === "done" ? "Now hang up" : "Say goodbye"} variant="call-stop" disabled={goodbye === "playing"} onClick={() => void sayGoodbye()}><SpeakerHigh weight="fill" /></RoundButton>
+            <RoundButton label="Block & report" variant="call-muted" onClick={() => actionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}><Prohibit weight="bold" /></RoundButton>
+          </>}
+          {stage === "done" && result?.verdict === "safe" && <RoundButton label="Talk to them" variant="call-go" onClick={() => toast.success("Go ahead and talk", { description: "Still: never send money or share codes on a call you didn't expect." })}><Phone weight="fill" /></RoundButton>}
         </div>
-        <button className="answer-button" onClick={() => void answer()}><PhoneIncoming size={30} />Answer with CallCanary</button>
-        <p className="form-hint">The caller&apos;s reply is sent to ElevenLabs to turn it into words and to Google&apos;s Gemini to judge it. Nothing is saved. Your contacts are only compared, never stored or sent to the AI.</p>
-        <ContactsCard contacts={contacts} onChange={updateContacts} />
-        <details className="demo-panel screen-demos"><summary>Try a sample call</summary>
-          <p>Hear a recorded caller answer CallCanary, then watch the real checks run. Uses a sample contact “Jake” at (210) 555-0147.</p>
-          <div className="demo-buttons">{SCREEN_DEMOS.map(sample => <button key={sample.id} onClick={() => void runDemo(sample)}><Play size={20} aria-hidden="true" /> {sample.label}<small>{sample.phone}</small></button>)}</div>
-        </details>
+      </section>
+
+      {error && <Alert variant="destructive" role="alert"><Warning weight="bold" /><AlertDescription>{error}</AlertDescription></Alert>}
+
+      {stage === "checking" && <Card><CardHeader className="pb-3"><CardTitle>How CallCanary is checking</CardTitle></CardHeader>
+        <CardContent><LayerList layers={progress?.layers || []} decidedBy={null} /></CardContent></Card>}
+
+      {stage === "done" && result && <>
+        {(result.stated_name || result.stated_reason) && <Card><CardHeader className="pb-2"><CardTitle>The caller said</CardTitle></CardHeader>
+          <CardContent className="grid gap-1 text-xl">
+            {result.stated_name && <p>Name: <strong>{result.stated_name}</strong></p>}
+            {result.stated_reason && <p>Reason: <strong>{result.stated_reason}</strong></p>}
+          </CardContent></Card>}
+        {result.red_flags.length > 0 && <Card className="border-danger/40"><CardHeader className="pb-2"><CardTitle>Warning signs</CardTitle></CardHeader>
+          <CardContent><ul className="grid gap-2">{result.red_flags.map((flag, i) => <motion.li key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 * i }}
+            className="flex items-start gap-3 text-xl"><Warning size={26} weight="fill" className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />{flag}</motion.li>)}</ul></CardContent></Card>}
+        <Card><CardHeader className="pb-3"><CardTitle>How CallCanary checked</CardTitle></CardHeader>
+          <CardContent><LayerList layers={result.layers} decidedBy={result.decided_by} /></CardContent></Card>
+        {result.verdict === "scam" && <div ref={actionsRef} className="scroll-mt-24"><SafetyActions result={analysis} /></div>}
+        {result.verdict === "careful" && <p ref={actionsRef} className="scroll-mt-24 text-lg text-muted-foreground">If they really know you, they can leave a voicemail or call back. Never send money or share codes on a call you didn&apos;t expect.</p>}
+        <Button variant="secondary" size="xl" onClick={reset}><ArrowCounterClockwise weight="bold" />Screen another call</Button>
       </>}
 
-      {busy && <div className="screen-live" role="status" aria-live="polite">
-        {demo && <p className="demo-tag">Sample call: {demo.label} · {demo.phone}</p>}
-        <Mascot mood={mood} />
-        <h2>{stage === "greeting" ? "CallCanary is greeting the caller…" : stage === "recording" ? (heard ? "Listening to the caller…" : "Waiting for the caller to answer…") : "Checking what they said…"}</h2>
-        {stage === "greeting" && <p className="lesson">“{SCREEN_GREETING}”</p>}
-        {stage === "recording" && demo && <p className="lesson">Caller: “{demo.text}”</p>}
-        {stage === "recording" && !demo && <button className="big-action action-plain" onClick={() => stopRecording.current()}><Square size={24} />They&apos;re done talking</button>}
-        {stage === "checking" && <LayerList layers={progress?.layers || []} decidedBy={null} />}
-        <button className="big-action action-report" onClick={reset}>Cancel</button>
-      </div>}
-
-      {error && <div className="error-message" role="alert"><AlertTriangle size={24} /><p>{error}</p></div>}
-
-      {stage === "done" && result && <ScreenResultView result={result} mood={mood} demo={demo} goodbye={goodbye} onGoodbye={() => void sayGoodbye()} onReset={reset} />}
-    </section>
+      {stage === "idle" && <>
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2"><Hash size={28} weight="bold" aria-hidden="true" />Check the caller&apos;s number</CardTitle></CardHeader>
+          <CardContent className="grid gap-3">
+            <Label htmlFor="caller-number">Number on your phone screen (optional)</Label>
+            <Input id="caller-number" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={event => { setPhone(event.target.value); setLookup(null); }} placeholder="e.g. (210) 555-0100" />
+            <Button variant="outline" size="lg" disabled={!phone.trim() || looking} onClick={() => void checkNumber()}>{looking ? "Checking…" : "Check this number"}</Button>
+            <AnimatePresence>{lookup && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}><NumberResult lookup={lookup} /></motion.div>}</AnimatePresence>
+          </CardContent>
+        </Card>
+        <ContactsCard contacts={contacts} onChange={updateContacts} />
+        <SampleCalls onRun={sample => void runDemo(sample)} />
+        <p className="text-base text-muted-foreground">The caller&apos;s reply is sent to ElevenLabs to turn it into words and to Google&apos;s Gemini to judge it. Nothing is saved. Your contacts are only compared, never stored or sent to the AI.</p>
+      </>}
+    </div>
   </main>;
 }
 
+function RoundButton({ label, variant, children, onClick, disabled }: { label: string; variant: "call-go" | "call-stop" | "call-muted"; children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+  return <div className="grid w-28 justify-items-center gap-2">
+    <Button size="round" variant={variant} onClick={onClick} disabled={disabled} aria-label={label}>{children}</Button>
+    <span className="text-base font-bold leading-tight text-white/90" aria-hidden="true">{label}</span>
+  </div>;
+}
+
+function LayerList({ layers, decidedBy }: { layers: ScreenLayer[]; decidedBy: ScreenResult["decided_by"] | null }) {
+  if (!layers.length) return <p className="text-lg text-muted-foreground">Starting the checks…</p>;
+  return <ul className="grid gap-3" aria-live="polite">{layers.map((layer, i) => {
+    const look = layerLook[layer.status]; const decided = layer.id === decidedBy;
+    return <motion.li key={layer.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}
+      className={cn("flex items-start gap-3 rounded-xl border-2 p-4", decided ? "border-foreground bg-[hsl(46_100%_96%)]" : "border-border", layer.status === "pending" && "border-dashed")}>
+      <look.Icon size={30} weight="fill" className={cn("mt-0.5 shrink-0", look.className)} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2 text-xl font-bold"><span className="sr-only">{look.word}: </span>{layer.label}{decided && <Badge>Decided</Badge>}</p>
+        <p className="break-words text-lg text-muted-foreground">{layer.detail}</p>
+      </div>
+    </motion.li>;
+  })}</ul>;
+}
+
+function NumberResult({ lookup }: { lookup: NumberCheck & { error?: string } }) {
+  if (lookup.status === "invalid") return <Alert variant="destructive" role="alert"><Warning weight="bold" /><AlertDescription>{lookup.error || "Please enter a 10-digit US phone number."}</AlertDescription></Alert>;
+  if (lookup.status === "unavailable") return <Alert variant="warn" role="status"><Warning weight="bold" /><AlertDescription>{lookup.detail}</AlertDescription></Alert>;
+  if (lookup.status === "reported") return <Alert variant="destructive" className="bg-danger-soft" role="status"><XCircle weight="fill" /><AlertDescription className="grid gap-1">
+    <p className="text-xl font-extrabold">Reported to the FTC {lookup.reports} {lookup.reports === 1 ? "time" : "times"}</p>
+    <p className="text-foreground">Most recently {lookup.last_reported}, about “{lookup.topic}”{lookup.robocall_reports ? `. ${lookup.robocall_reports} said it was a robocall` : ""}.</p>
+    <p className="text-base text-muted-foreground">Reports are complaints, not proof. Scammers can also fake caller ID. Let it go to voicemail.</p>
+  </AlertDescription></Alert>;
+  return <Alert variant="safe" role="status"><CheckCircle weight="fill" /><AlertDescription className="grid gap-1">
+    <p className="text-xl font-extrabold">Not on the FTC complaint list</p>
+    <p className="text-base text-muted-foreground">Checked {lookup.from} to {lookup.to}. That doesn&apos;t mean it&apos;s safe: new scam numbers appear every day, and caller ID can be faked.</p>
+  </AlertDescription></Alert>;
+}
+
 function ContactsCard({ contacts, onChange }: { contacts: TrustedContact[]; onChange: (next: TrustedContact[]) => void }) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState(""); const [number, setNumber] = useState(""); const [problem, setProblem] = useState("");
   function add() {
     const digits = normalizeUsNumber(number);
     if (!name.trim()) { setProblem("Enter their name."); return; }
     if (number.trim() && !digits) { setProblem("Enter a 10-digit US phone number, or leave it blank."); return; }
     onChange(sanitizeContacts([...contacts, { name, phone: digits }])); setName(""); setNumber(""); setProblem("");
+    toast.success(`${name.trim()} saved`, { description: "Saved only on this device." });
   }
-  return <details className="check-card contacts-card">
-    <summary><Users size={24} aria-hidden="true" /> Trusted contacts ({contacts.length})</summary>
-    <p className="form-hint">If a caller says “It&apos;s Jake” from a number that isn&apos;t Jake&apos;s, CallCanary warns you. Saved only on this device.</p>
-    {contacts.length > 0 && <ul className="contact-list">{contacts.map((contact, i) => <li key={`${contact.name}-${i}`}>
-      <span><strong>{contact.name}</strong><small>{contact.phone ? formatUsNumber(contact.phone) : "No number saved"}</small></span>
-      <button aria-label={`Remove ${contact.name}`} onClick={() => onChange(contacts.filter((_, j) => j !== i))}><Trash2 size={22} /></button>
-    </li>)}</ul>}
-    <div className="contact-form">
-      <label htmlFor="contact-new-name">Name</label>
-      <input id="contact-new-name" value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Jake" autoComplete="off" />
-      <label htmlFor="contact-new-phone">Their phone number</label>
-      <input id="contact-new-phone" type="tel" inputMode="tel" value={number} onChange={event => setNumber(event.target.value)} placeholder="e.g. (210) 555-0147" autoComplete="off" />
-      {problem && <p className="lesson" role="alert">{problem}</p>}
-      <button className="big-action action-plain" onClick={add}><UserPlus size={24} />Add contact</button>
-    </div>
-  </details>;
+  function remove(index: number) {
+    const removed = contacts[index]; onChange(contacts.filter((_, j) => j !== index));
+    toast(`${removed.name} removed`, { action: { label: "Undo", onClick: () => onChange(sanitizeContacts([...contacts])) } });
+  }
+  return <Collapsible open={open} onOpenChange={setOpen} asChild>
+    <Card>
+      <CollapsibleTrigger className="flex min-h-[72px] w-full items-center justify-between gap-3 rounded-xl px-6 text-left font-display text-2xl font-extrabold">
+        <span className="flex items-center gap-3"><UsersThree size={30} weight="fill" className="text-primary" aria-hidden="true" />Trusted contacts <Badge variant="secondary">{contacts.length}</Badge></span>
+        <CaretDown size={26} weight="bold" className={cn("shrink-0 transition-transform", open && "rotate-180")} aria-hidden="true" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <CardContent className="grid gap-4">
+          <p className="text-lg text-muted-foreground">If a caller says “It&apos;s Jake” from a number that isn&apos;t Jake&apos;s, CallCanary warns you. Saved only on this device.</p>
+          {contacts.length > 0 && <ul className="grid gap-2">{contacts.map((contact, i) => <li key={`${contact.name}-${i}`} className="flex items-center justify-between gap-3 rounded-xl border-2 p-3">
+            <span className="min-w-0"><strong className="block text-xl">{contact.name}</strong><span className="text-lg text-muted-foreground">{contact.phone ? formatUsNumber(contact.phone) : "No number saved"}</span></span>
+            <Button variant="outline-danger" size="icon" aria-label={`Remove ${contact.name}`} onClick={() => remove(i)}><Trash weight="bold" /></Button>
+          </li>)}</ul>}
+          <div className="grid gap-3">
+            <Label htmlFor="contact-new-name">Name</Label>
+            <Input id="contact-new-name" value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Jake" autoComplete="off" />
+            <Label htmlFor="contact-new-phone">Their phone number</Label>
+            <Input id="contact-new-phone" type="tel" inputMode="tel" value={number} onChange={event => setNumber(event.target.value)} placeholder="e.g. (210) 555-0147" autoComplete="off" />
+            {problem && <p className="text-lg font-bold text-destructive" role="alert">{problem}</p>}
+            <Button size="lg" onClick={add}><UserPlus weight="bold" />Add contact</Button>
+          </div>
+        </CardContent>
+      </CollapsibleContent>
+    </Card>
+  </Collapsible>;
 }
 
-function LayerList({ layers, decidedBy }: { layers: ScreenLayer[]; decidedBy: ScreenResult["decided_by"] | null }) {
-  if (!layers.length) return <p className="lesson">Starting the checks…</p>;
-  return <ul className="layer-list" aria-live="polite">{layers.map(layer => <li key={layer.id} className={`${layer.id === decidedBy ? "layer-decided" : ""} layer-${layer.status}`}>
-    <span className="layer-icon" aria-hidden="true">{layerIcon[layer.status]}</span>
-    <span><strong>{layer.label}</strong>{layer.id === decidedBy && <em className="decided-badge">Decided</em>}<small>{layer.detail}</small></span>
-  </li>)}</ul>;
-}
-
-function NumberResult({ lookup }: { lookup: NumberCheck & { error?: string } }) {
-  if (lookup.status === "invalid") return <p className="lesson" role="alert">{lookup.error || "Please enter a 10-digit US phone number."}</p>;
-  if (lookup.status === "unavailable") return <p className="lesson" role="status">{lookup.detail}</p>;
-  if (lookup.status === "reported") return <div className="number-result number-reported" role="status">
-    <p><strong>⛔ Reported to the FTC {lookup.reports} {lookup.reports === 1 ? "time" : "times"}</strong></p>
-    <p>Most recently {lookup.last_reported}, about “{lookup.topic}”{lookup.robocall_reports ? `. ${lookup.robocall_reports} said it was a robocall` : ""}.</p>
-    <p className="form-hint">Reports are complaints, not proof. Scammers can also fake caller ID. Let it go to voicemail.</p>
-  </div>;
-  return <div className="number-result number-clear" role="status">
-    <p><strong>Not on the FTC complaint list</strong> ({lookup.from} to {lookup.to}).</p>
-    <p className="form-hint">That doesn&apos;t mean it&apos;s safe: new scam numbers appear every day, and caller ID can be faked.</p>
-  </div>;
-}
-
-function ScreenResultView({ result, mood, demo, goodbye, onGoodbye, onReset }: { result: ScreenResult; mood: MascotMood; demo: ScreenDemo | null; goodbye: "idle" | "playing" | "done"; onGoodbye: () => void; onReset: () => void }) {
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, []);
-  const look = banner[result.verdict];
-  const analysis = { risk_score: 90, level: "scam" as const, scam_type: "other" as const, reasons: [result.explanation], red_flags: [] };
-  return <section className="email-result" aria-labelledby="screen-verdict">
-    {demo && <p className="demo-tag">Sample call: {demo.label} · {demo.phone}</p>}
-    <div className={`verdict-banner ${look.className}`}>
-      <Mascot mood={mood} />
-      <h2 id="screen-verdict" ref={heading} tabIndex={-1}><span aria-hidden="true">{look.icon} </span>{result.headline}</h2>
-      <p className="verdict-action">{result.explanation}</p>
-    </div>
-    {(result.stated_name || result.stated_reason) && <div className="check-card">
-      <h3>The caller said:</h3>
-      {result.stated_name && <p className="sender-line">Name: <strong>{result.stated_name}</strong></p>}
-      {result.stated_reason && <p className="sender-line">Reason: <strong>{result.stated_reason}</strong></p>}
-    </div>}
-    {result.red_flags.length > 0 && <div className="check-card"><h3>Warning signs:</h3>
-      <ul className="pressure-list">{result.red_flags.map((flag, i) => <li key={i}><AlertTriangle size={22} aria-hidden="true" />{flag}</li>)}</ul></div>}
-    <div className="check-card">
-      <h3>How CallCanary checked:</h3>
-      <LayerList layers={result.layers} decidedBy={result.decided_by} />
-    </div>
-    <div className="email-actions">
-      {result.verdict === "safe" ? <div className="confirm-box" role="status"><p><CheckCircle2 size={22} aria-hidden="true" /> You can talk to them now.</p><p>Still: never send money or share codes on a call you didn&apos;t expect.</p></div> : <>
-        <button className="big-action action-danger" disabled={goodbye === "playing"} onClick={onGoodbye}><Volume2 size={28} />{goodbye === "playing" ? "Saying goodbye…" : "Have CallCanary say goodbye"}</button>
-        {goodbye === "done" && <div className="confirm-box" role="status"><p><PhoneOff size={22} aria-hidden="true" /> Now hang up on your phone.</p></div>}
-        {result.verdict === "scam" && <SafetyActions result={analysis} />}
-      </>}
-      {result.verdict !== "safe" && <p className="form-hint"><CircleSlash size={18} aria-hidden="true" /> If they really know you, they can leave a voicemail or call back.</p>}
-      <button className="big-action action-plain" onClick={onReset}><RotateCcw size={26} />Screen another call</button>
-    </div>
-  </section>;
+function SampleCalls({ onRun }: { onRun: (sample: ScreenDemo) => void }) {
+  const [open, setOpen] = useState(false);
+  return <Collapsible open={open} onOpenChange={setOpen} asChild>
+    <Card className="border-accent bg-[hsl(47_100%_96%)]">
+      <CollapsibleTrigger className="flex min-h-[72px] w-full items-center justify-between gap-3 rounded-xl px-6 text-left font-display text-2xl font-extrabold">
+        <span className="flex items-center gap-3"><PlayCircle size={30} weight="fill" className="text-[hsl(40_90%_32%)]" aria-hidden="true" />Try a sample call</span>
+        <CaretDown size={26} weight="bold" className={cn("shrink-0 transition-transform", open && "rotate-180")} aria-hidden="true" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <CardContent className="grid gap-3">
+          <p className="text-lg text-muted-foreground">Hear a recorded caller answer CallCanary, then watch the real checks run. Uses a sample contact “Jake” at (210) 555-0147.</p>
+          {SCREEN_DEMOS.map(sample => <Button key={sample.id} variant="outline" className="h-auto justify-start whitespace-normal py-3 text-left" onClick={() => onRun(sample)}>
+            <PlayCircle weight="fill" className="text-primary" /><span className="grid"><span>{sample.label}</span><span className="text-base font-semibold text-muted-foreground">{sample.phone}</span></span>
+          </Button>)}
+        </CardContent>
+      </CollapsibleContent>
+    </Card>
+  </Collapsible>;
 }
