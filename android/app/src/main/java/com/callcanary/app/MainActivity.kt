@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -40,6 +42,9 @@ import com.callcanary.app.ui.CallCanaryTheme
 import com.callcanary.app.ui.CheckScreen
 import com.callcanary.app.ui.HomeScreen
 import com.callcanary.app.ui.SettingsScreen
+import com.callcanary.app.ui.demo.DemoStage
+import com.callcanary.app.ui.demo.DemoTourScreen
+import com.callcanary.app.ui.demo.Scene
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,9 +69,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             CallCanaryTheme {
                 var tab by rememberSaveable { mutableStateOf(0) }
+                // A playing demo takes over the whole screen; closing it returns to the app with updated counts.
+                var demo by remember { mutableStateOf<List<Scene>?>(null) }
+                demo?.let { scenes -> DemoStage(scenes, store) { demo = null; refresh++ }; return@CallCanaryTheme }
                 Scaffold(containerColor = CC.Paper, bottomBar = {
                     NavigationBar(containerColor = CC.Coal) {
-                        listOf("Home" to Icons.Filled.Home, "Check" to Icons.Filled.Search, "Blocked" to Icons.Filled.Lock, "Settings" to Icons.Filled.Settings).forEachIndexed { i, (label, icon) ->
+                        listOf("Home" to Icons.Filled.Home, "Check" to Icons.Filled.Search, "Blocked" to Icons.Filled.Lock, "Demo" to Icons.Filled.PlayArrow, "Settings" to Icons.Filled.Settings).forEachIndexed { i, (label, icon) ->
                             NavigationBarItem(selected = tab == i, onClick = { tab = i; refresh++ }, icon = { Icon(icon, contentDescription = null) },
                                 label = { Text(label, fontSize = 14.sp) },
                                 colors = NavigationBarItemDefaults.colors(selectedIconColor = CC.Coal, selectedTextColor = CC.Lamp, indicatorColor = CC.Lamp,
@@ -80,6 +88,7 @@ class MainActivity : ComponentActivity() {
                             0 -> HomeScreen(screeningOn, notificationsOn, store, refresh, onTurnOn = ::requestScreening, onNotifications = ::requestNotifications, onCheck = { tab = 1 })
                             1 -> CheckScreen(store = store)
                             2 -> BlockedScreen(store, refresh) { refresh++ }
+                            3 -> DemoTourScreen { demo = it }
                             else -> SettingsScreen(store, reported, refresh, onChanged = { refresh++ }, onClearHistory = { store.clearEvents(); refresh++ })
                         }
                     }

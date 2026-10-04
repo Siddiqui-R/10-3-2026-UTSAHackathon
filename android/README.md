@@ -14,6 +14,20 @@ A native Android app (Kotlin, Jetpack Compose) that brings CallCanary's protecti
 
 What it can't do: Android doesn't let third-party apps hear call audio, so in-call listening stays on the website (with the call on speaker, ideally on a second device).
 
+## Demo mode (Demo tab)
+
+For presentations: **Play full tour** runs seven full-screen scenes in about two minutes, or tap one to show a single feature. Sound on.
+
+1. **Gmail scan:** connects a sample inbox, checks each email, moves the fake PayPal and Microsoft emails to Scam, and opens one with its typos, fake link and fake sender.
+2. **Scam website blocked:** a browser types rnicrosoft.com and CallCanary blocks it, comparing **rn**icrosoft.com with **m**icrosoft.com.
+3. **Scam text:** a USPS fee text is flagged; tapping its link shows the block page.
+4. **Reported robocall:** an incoming call from (201) 266-3840 is checked against the real FTC list and blocked before it rings, with a real notification.
+5. **Live call protection:** you answer a fake bank-fraud call; CallCanary listens with live captions and warning chips, raises a SCAM CALL alert, explains out loud in its own voice, and hangs up and blocks.
+6. **AI call screener:** CallCanary answers in its voice, the caller speaks, the checks tick off, it says goodbye and blocks the number.
+7. **Summary:** today's counts and blocked numbers.
+
+The scenes are scripted and work offline, with the voices bundled in res/raw, so a presentation never depends on the network. The numbers they block really appear in the Blocked tab and Recent activity; clear them in Blocked and Settings after a demo. Use the top-right buttons to skip a scene or close the tour.
+
 ## Build
 
 Requirements: JDK 17 or 21 and the Android SDK (platform 35, build tools 35). Put the SDK path in `local.properties` (`sdk.dir=…`).
