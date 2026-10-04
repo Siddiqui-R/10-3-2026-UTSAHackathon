@@ -4,3 +4,9 @@ export const demoTranscripts = {
   phishing: "USPS: Your package could not be delivered. Update your address and pay a 30 cent redelivery fee now: usps-track-secure dot r u",
 } as const;
 export const WARNING_SCRIPT = "Warning. This was a scam call. Do not send money. Do not share personal information. Hang up, then delete and block this number now.";
+export const DEMO_PHISHING_EMAIL = `Subject: Urgent: Your PayPal account has been suspended
+From: PayPal Support <support@paypa1-secure.ru>
+"Dear customer, We have detected unusual activty on your account. Your account will be
+permenantly suspended within 24 hours unless you verify your identity now. Click here to
+secure your account: https://paypa1-secure.ru/verify (display text: www.paypal.com/signin).
+Do not ignore this message. Sincerly, PayPal Security Team"`;

@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Headphones, Mic, MicOff, ShieldCheck, ShieldOff } from "lucide-react";
+import { AlertTriangle, Headphones, Mic, MicOff, ShieldOff } from "lucide-react";
 import type { Analysis } from "@/lib/analysis";
 import { demoTranscripts } from "@/lib/demoTranscripts";
 import { scoreSignals, SIGNAL_THRESHOLD } from "@/lib/scamSignals";
 import { analyzeTranscript, useListening } from "@/lib/useListening";
 import RiskMeter from "@/components/RiskMeter";
 import WarningTakeover from "@/components/WarningTakeover";
+import TopBar from "@/components/TopBar";
 import Mascot, { type MascotMood } from "@/components/Mascot";
 import { warningText } from "@/lib/warningText";
 import { speakWithDeviceVoice } from "@/lib/deviceVoice";
@@ -112,8 +113,8 @@ export default function Home() {
     onRetry={() => void prepareWarning(result)} onReset={reset} />;
 
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-mark"><ShieldCheck size={28} /></div>CallCanary</div>
-      <span className={`connection-pill ${health?.ready ? "connected" : ""}`}>{health === null ? "Checking connections…" : health.ready ? "Providers configured" : "Setup needed"}</span></header>
+    <TopBar active="call">
+      <span className={`connection-pill ${health?.ready ? "connected" : ""}`}>{health === null ? "Checking connections…" : health.ready ? "Providers configured" : "Setup needed"}</span></TopBar>
     <section className="home-content monitor-content">
       <div className="intro-copy"><p className="eyebrow">Your canary in the coal mine for phone scams.</p>
         <h1>A little bird. A big warning.</h1><p className="intro-subtitle">Turn on protection. Put your call on speaker. I&apos;ll listen for trouble.</p></div>

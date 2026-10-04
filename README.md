@@ -31,6 +31,16 @@ The ElevenLabs key needs Text to Speech, Speech to Text, Voices read and Models 
 - While listening, the page asks the browser for a screen wake lock and shows whether it was granted.
 - Listening continues until stopped or a scam intervention. Browser suspension, page closure, locked devices and browser permission policies can interrupt it. This web app cannot guarantee system-wide background monitoring or directly intercept telephone audio.
 
+## Check an email (/email)
+
+Paste a whole email (plain text or HTML) or just a link. Two layers:
+- **Link check, in code** (`lib/linkCheck.ts`): every link is pulled from the text, HTML `href`s, Markdown links and "url (display text: …)" notes. Each one is checked for where it claims to go versus where it really goes, look-alike brand domains (paypa1, rnicrosoft, usps-track-secure.ru; edit distance and character swaps against official domains), risky endings (.ru, .tk, .ml, .ga, .cf, .xyz, .top, .buzz), link shorteners, punycode (`xn--`), raw IP addresses, the "@" trick and stacked subdomains. It also compares the From display name with the real address, and checks for a different Reply-To. Links are never opened.
+- **Gemini** (`lib/emailAnalysis.ts`) gets the email plus that link report. It finds typos, explains each link and the sender, and lists pressure tricks. Typos it can't quote from the email are dropped. The AI can raise a link's verdict but never lower it, and a dangerous link or spoofed sender always makes the email PHISHING. If Gemini is unavailable, the code result is shown and labelled as such.
+
+"Delete this email" asks for confirmation, then shows how to delete it in Gmail, Outlook, iPhone Mail and Yahoo, because a website can't reach your inbox. "Report & save links" saves the report on this device only and shows how to report it (reportphishing@apwg.org, the FTC). It never claims anything was sent.
+
+Gemini calls (`lib/gemini.ts`) are hedged. If a model hasn't answered within 5 seconds, the next one starts in parallel, the first valid answer wins, and the others are cancelled. Flash-Lite models are a last resort.
+
 ## Mascot and speech
 
 See [mascot asset, moods and voice](docs/mascot.md). The mascot sleeps while protection is off. It is alert while listening, looks concerned (amber "?") while a check runs, and pops up with a red "!" to speak a warning. Reduced-motion users get the same states without animation.
