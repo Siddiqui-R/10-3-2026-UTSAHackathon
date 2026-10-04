@@ -46,6 +46,8 @@ class LiveCallService : Service() {
         val downloadProgress: Float = 0f,
         val recording: File? = null,
         val error: String? = null,
+        /** Shown after "Block": Android may not let CallCanary end the call itself. */
+        val note: String? = null,
     )
     data class ScamSignal(val label: String, val phrase: String, val weight: Int)
     enum class Phase { Idle, Preparing, Listening, Alert, Ended }
@@ -64,7 +66,11 @@ class LiveCallService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> finish("Stopped listening")
-            ACTION_HANG_UP -> { hangUpAndBlock(); finish("Hung up and blocked") }
+            ACTION_HANG_UP -> {
+                val ended = hangUpAndBlock()
+                finish(if (ended) "Hung up and blocked" else "Blocked the caller")
+                if (!ended) _state.update { it.copy(note = "Blocked. Now press the red button on the call screen to hang up.") }
+            }
             else -> begin(intent?.getStringExtra(EXTRA_NUMBER))
         }
         return START_NOT_STICKY
@@ -124,15 +130,17 @@ class LiveCallService : Service() {
         store.addEvent("live", "Scam warning during a call", reasons.replaceFirstChar { it.uppercase() }, blocked = false)
     }
 
-    private fun hangUpAndBlock() {
+    /** Blocks the caller and tries to end the call; Android 10+ usually only lets the phone app hang up, so this returns whether it did. */
+    private fun hangUpAndBlock(): Boolean {
         val number = _state.value.number
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED)
-            @Suppress("DEPRECATION") runCatching { getSystemService(TelecomManager::class.java).endCall() }
+        val ended = ContextCompat.checkSelfPermission(this, Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED &&
+            @Suppress("DEPRECATION") runCatching { getSystemService(TelecomManager::class.java).endCall() }.getOrDefault(false)
         if (number != null && PhoneNumbers.normalizeUs(number) != null) {
             val reasons = _state.value.signals.take(2).joinToString(", ") { it.label }.ifBlank { "You hung up on this caller" }
             store.block(number, reasons)
             store.addEvent("call", "Blocked ${PhoneNumbers.format(number)}", reasons, blocked = true)
         }
+        return ended
     }
 
     private fun finish(title: String) {

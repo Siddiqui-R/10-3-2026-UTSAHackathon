@@ -85,6 +85,14 @@ class ListenActivity : ComponentActivity() {
         }
     }
 
+    // Tapping "Protect this call" while this screen is already open delivers the call here instead of onCreate.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra(EXTRA_NUMBER)?.let { number = it }
+        if (intent.getBooleanExtra(EXTRA_AUTO_START, false)) startListening()
+    }
+
     private fun startListening() {
         val wanted = listOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_PHONE_STATE, Manifest.permission.ANSWER_PHONE_CALLS, Manifest.permission.POST_NOTIFICATIONS)
         val missing = wanted.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
@@ -98,13 +106,13 @@ class ListenActivity : ComponentActivity() {
             LiveCallService.Phase.Preparing -> if (state.downloadProgress in 0.001f..0.999f) "Getting ready" else "Starting…"
             LiveCallService.Phase.Listening -> "Listening"
             LiveCallService.Phase.Alert -> "SCAM CALL. Hang up."
-            else -> "Protect a call"
+            else -> if (state.note != null) "Caller blocked" else "Protect a call"
         }
         val subtitle = when (state.phase) {
             LiveCallService.Phase.Preparing -> if (state.downloadProgress > 0f) "Downloading the speech model once (about 40 MB). After this it works offline." else "Loading the speech model…"
             LiveCallService.Phase.Listening -> "Keep the call on speaker. CallCanary listens on this phone; nothing is uploaded."
             LiveCallService.Phase.Alert -> "Don't send money, buy gift cards or read any code. Real banks and agencies never ask for that."
-            else -> state.error ?: "Put the call on speaker and tap Start. CallCanary listens for scam tricks and warns you right away."
+            else -> state.note ?: state.error ?: "Put the call on speaker and tap Start. CallCanary listens for scam tricks and warns you right away."
         }
         if (alert) Column(Modifier.fillMaxWidth().background(CC.Danger).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Mascot(awake = true, size = 110.dp)
@@ -146,7 +154,7 @@ class ListenActivity : ComponentActivity() {
                 Text("⚠ ${s.label}: “${s.phrase}”", color = if (s.weight >= 25) CC.Danger else CC.Warn, fontWeight = FontWeight.Bold)
             }
         }
-        val hangUpLabel = if (state.number != null && PhoneNumbers.normalizeUs(state.number) != null) "Hang up & block ${PhoneNumbers.format(state.number)}" else "Hang up"
+        val hangUpLabel = if (state.number != null && PhoneNumbers.normalizeUs(state.number) != null) "Block ${PhoneNumbers.format(state.number)} & hang up" else "Hang up"
         BigButton(hangUpLabel, { LiveCallService.send(this, LiveCallService.ACTION_HANG_UP) }, color = CC.Danger)
         BigButton("Stop listening", { LiveCallService.send(this, LiveCallService.ACTION_STOP) }, color = Color.White, textColor = CC.Pine)
     }
@@ -158,7 +166,7 @@ class ListenActivity : ComponentActivity() {
         files.groupBy { it.nameWithoutExtension }.forEach { (name, group) ->
             val wav = group.firstOrNull { it.extension == "wav" }
             val txt = group.firstOrNull { it.extension == "txt" }
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(2.dp, Color(0xFFDCE3DC))) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(2.dp, Color(0xFFDCE3DC))) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(group.maxOf { it.lastModified() })), fontWeight = FontWeight.Bold)
                     txt?.let { Text(runCatching { it.readText() }.getOrDefault("").lines().take(6).joinToString("\n"), color = CC.Muted, fontSize = 15.sp) }
