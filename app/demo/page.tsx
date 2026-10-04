@@ -17,6 +17,7 @@ export default function ProductDemo() {
   const app = useDemoApp();
   const [controls, setControls] = useState(true);
   const [captions, setCaptions] = useState(true);
+  const [demoChip, setDemoChip] = useState(true);
   // Keyboard shortcuts for recording: H hides the controls, C toggles captions.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -52,6 +53,7 @@ export default function ProductDemo() {
           </button></li>; })}</ol>
         <div className="grid gap-3 rounded-2xl border-2 border-white/15 p-4">
           <div className="flex items-center gap-3"><Switch id="captions" checked={captions} onCheckedChange={setCaptions} /><Label htmlFor="captions" className="text-lg">Show captions for the video</Label></div>
+          <div className="flex items-center gap-3"><Switch id="demo-chip" checked={demoChip} onCheckedChange={setDemoChip} /><Label htmlFor="demo-chip" className="text-lg">Show the DEMO label on the phone</Label></div>
           <Button variant="ghost" className="justify-start text-white hover:bg-white/10" onClick={() => setControls(false)}><EyeSlash weight="bold" />Hide controls for recording (press H)</Button>
           <p className="text-base text-[#c9d6c4]">For your video: email, text, website and call verdicts come from CallCanary&apos;s real checks and AI. Reading Gmail, blocking numbers and blocking websites on a phone would need the CallCanary mobile app, so this demo shows them without changing anything.</p>
         </div>
@@ -60,7 +62,7 @@ export default function ProductDemo() {
         {/* The phone: a device frame on larger screens, edge to edge on a phone. */}
         <div className="h-[min(820px,calc(100dvh-230px))] min-h-[580px] w-full max-w-[400px] rounded-[52px] bg-[#0a0f0c] p-3 shadow-[0_30px_80px_rgba(0,0,0,0.55),0_0_0_2px_rgba(255,255,255,0.08)] max-sm:h-[calc(100dvh-24px)] max-sm:rounded-[28px] max-sm:p-1.5">
           <div className="relative h-full overflow-hidden rounded-[42px] max-sm:rounded-[24px]">
-            <PhoneApp app={app} />
+            <PhoneApp app={app} demoChip={demoChip} />
             <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-2 z-50 h-6 w-28 -translate-x-1/2 rounded-full bg-black max-sm:hidden" />
           </div>
         </div>

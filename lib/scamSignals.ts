@@ -43,6 +43,8 @@ const rules: Rule[] = [
   { id: "secrecy", label: "Keep it secret", weight: 25, patterns: [
     /\b(?:do not|don'?t|dont|never) (?:tell|mention (?:this|it) to|talk to) (?:anyone|anybody|your (?:kids|children|family|son|daughter|husband|wife|bank|teller)|mom|dad|the bank)\b(?! (?:your|the) (?:pin|password|code|social|account|card))/,
     /\bkeep (?:this|it) (?:a )?(?:secret|between us|quiet|confidential)\b/,
+    // Cutting the victim off from checking: "don't call the bank yourself".
+    /\b(?:do not|don'?t|dont) call (?:the bank|your bank|anyone|your family|your kids)(?: yourself)?\b/,
     /\b(?:if the bank|if the teller|if anyone) asks?,? (?:say|tell them)\b/,
   ] },
   { id: "urgent", label: "Pressure to act now", weight: 15, group: "pressure", patterns: [
@@ -53,6 +55,13 @@ const rules: Rule[] = [
     /\b(?:tell|give|read|send|share|confirm|verify|provide) (?:me |us )?(?:back )?(?:your |the |that )?(?:\w+ )?(?:password|pin(?: number)?|verification code|security code|confirmation code|one[- ]?time (?:code|passcode|password)|code (?:we|i) (?:just )?(?:sent|texted))\b/,
     /\b(?:what is|what'?s) your (?:social security number|ssn|bank account number|account number|routing number|card number|pin|password)\b/,
     /\b(?:need|confirm|verify|read me) (?:your |the )?(?:full )?(?:social security number|bank account number|card number|medicare number)\b/,
+    // "Read me the code as soon as you get it."
+    /\b(?:read|tell|give|send) (?:me|us) (?:the|that|this) (?:\w+ )?code\b/,
+  ] },
+  { id: "bank", label: "Claims to be your bank", weight: 15, patterns: [
+    /\b(?:fraud|security) (?:department|team|prevention|center) (?:at|of|from) (?:your|the) bank\b/,
+    /\b(?:calling|this is \w+) from your bank\b/,
+    /\bsuspicious (?:charge|transaction|purchase|withdrawal)s?\b/,
   ] },
   { id: "remote", label: "Remote access to a device", weight: 35, patterns: [
     /\b(?:anydesk|any desk|teamviewer|team viewer|ultraviewer|logmein|screen ?connect|remote access|remote desktop|quick ?assist)\b/,

@@ -17,6 +17,8 @@ module.exports = function testScoring() {
     "We talked at church about how scammers say don't tell your kids and stay on the line.",
     'The bank will never ask for your password or verification code. If someone asks you to send money, hang up.',
     "I'm not going to pay with gift cards, that is a scam.",
+    'My bank texted me a security code when I logged in, so I typed it into the app.',
+    'There was a suspicious charge on my card, so I called the number on the back and they fixed it.',
   ];
   for (const text of ordinary) {
     const { score, signals } = scoreSignals(text);
@@ -35,6 +37,8 @@ module.exports = function testScoring() {
     // Scammers often borrow anti-scam language. Direct demands still count.
     'This is the fraud department. Scammers accessed your account. Read me the code we just texted you.',
     'Hey sweetie, you need to wire me the money today, keep this between us.',
+    // Bank impersonation asking for the one-time code.
+    'Hi, this is Mark from the fraud department at your bank. Please read me the code as soon as you get it.',
     ...Object.values(demoTranscripts),
   ];
   for (const text of scams) {

@@ -44,6 +44,12 @@ export const TOUR: TourScene[] = [
   { id: "web", title: "Scam website blocked", caption: "rnicrosoft.com looks like Microsoft. CallCanary sees the trick and blocks it." },
   { id: "text", title: "Scam text", caption: "Texts with fake delivery fees and look-alike links are flagged." },
   { id: "robocall", title: "Reported robocall", caption: "Numbers reported to the FTC are blocked before your phone rings." },
+  { id: "live", title: "Live call protection", caption: "You answer a call. CallCanary listens, warns you the moment it turns into a scam, and blocks the number." },
   { id: "screener", title: "AI call screener", caption: "Unknown callers talk to CallCanary first. Its AI decides if it's a scam." },
   { id: "blocked", title: "Blocked list", caption: "Every blocked number, website and sender, with the reason why." },
 ];
+// A call the person answers themselves; CallCanary listens in the background (the "Listen to a call" feature).
+export const DEMO_LIVE_CALL = {
+  id: "livecall", number: "(512) 555-0187", audio: "/demo/live-call.mp3", voice: ["Eric", "Chris", "Daniel"],
+  text: "Hi, this is Mark from the fraud department at your bank. We stopped a suspicious charge of nine hundred dollars on your card. To cancel it, I'm texting you a verification code right now. Please read me the code as soon as you get it. Don't hang up, and don't call the bank yourself, the lines are busy. We have to do this now or the money will be gone.",
+};

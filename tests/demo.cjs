@@ -21,5 +21,5 @@ module.exports = function testDemo() {
   // The robocall number is still on the bundled FTC list.
   useIndexForTests(undefined);
   assert.equal(checkReportedNumber(DEMO_ROBOCALL.number).status, 'reported', 'refresh changed the FTC list: pick a new demo robocall number');
-  assert.equal(new Set(TOUR.map(s => s.id)).size, 7);
+  assert.equal(new Set(TOUR.map(s => s.id)).size, 8);
 };

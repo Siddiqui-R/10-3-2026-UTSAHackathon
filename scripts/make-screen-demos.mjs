@@ -1,6 +1,7 @@
 // Records the sample caller replies for "Screen a caller" with ElevenLabs stock voices (never the mascot's voice).
-//   node scripts/make-screen-demos.mjs
-// Reads ELEVENLABS_API_KEY from .env.local; writes public/demo/screen-<id>.mp3.
+//   node scripts/make-screen-demos.mjs           (all)
+//   node scripts/make-screen-demos.mjs livecall  (one)
+// Reads ELEVENLABS_API_KEY from .env.local; writes each sample to its audio path under public/.
 import fs from "node:fs";
 import path from "node:path";
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, "$1")), "..");
@@ -9,13 +10,14 @@ const env = Object.fromEntries(fs.readFileSync(path.join(root, ".env.local"), "u
 const key = env.ELEVENLABS_API_KEY;
 if (!key) { console.error("ELEVENLABS_API_KEY is not set in .env.local."); process.exit(1); }
 // The demo list lives in TypeScript; read the plain data out of it.
-const source = fs.readFileSync(path.join(root, "lib/screenDemos.ts"), "utf8");
-const demos = [...source.matchAll(/id: "(\w+)"[\s\S]*?audio: "([^"]+)", voice: \[([^\]]+)\],\s*text: "([^"]+)"/g)]
+// Sample calls for the screener and the live-call demo scene.
+const source = ["lib/screenDemos.ts", "lib/demoScenario.ts"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+const demos = [...source.matchAll(/id: "(\w+)"[^{}]*?audio: "([^"]+)", voice: \[([^\]]+)\],\s*text: "([^"]+)"/g)]
   .map(m => ({ id: m[1], audio: m[2], voices: m[3].match(/"([^"]+)"/g).map(v => v.slice(1, -1)), text: m[4] }));
 const { voices } = await (await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key } })).json();
 const mascot = env.ELEVENLABS_MASCOT_VOICE_ID || env.ELEVENLABS_VOICE_ID;
 const callers = voices.filter(v => v.voice_id !== mascot);
-for (const demo of demos) {
+for (const demo of demos.filter(d => !process.argv[2] || d.id === process.argv[2])) {
   const voice = demo.voices.map(name => callers.find(v => v.name.startsWith(name))).find(Boolean) || callers[0];
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice.voice_id}?output_format=mp3_22050_32`, {
     method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },

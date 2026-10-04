@@ -10,6 +10,7 @@ import { brandInfo, lookalikeBrand, type LinkFinding } from "@/lib/linkCheck";
 import type { ScreenLayer } from "@/lib/screening";
 import { cn } from "@/lib/utils";
 import type { DemoApp, MailItem } from "./useDemoApp";
+import LiveCallScreen from "./LiveCallScreen";
 import { DEMO_SITES, DEMO_TEXT } from "@/lib/demoScenario";
 
 const tabs = [
@@ -24,14 +25,14 @@ const statusLook = {
   safe: { label: "Safe", className: "bg-safe-soft text-safe" },
 } as const;
 
-export default function PhoneApp({ app }: { app: DemoApp }) {
+export default function PhoneApp({ app, demoChip = true }: { app: DemoApp; demoChip?: boolean }) {
   const open = app.mail.find(m => m.id === app.openId);
   const tabBadge = { inbox: app.mail.filter(m => m.folder === "scam").length + (app.text.status === "scam" ? 1 : 0), blocked: app.blocked.length } as Record<string, number>;
   return <div className="relative flex h-full flex-col overflow-hidden bg-background text-foreground">
     {/* Status bar */}
     <div className="z-20 flex h-11 shrink-0 items-center justify-between bg-coal-2 px-6 text-[13px] font-bold text-white">
       <span className="tabular-nums">9:41</span>
-      <span className="rounded-full bg-lamp px-2 py-0.5 text-[11px] font-extrabold tracking-[0.12em] text-coal">DEMO</span>
+      {demoChip ? <span className="rounded-full bg-lamp px-2 py-0.5 text-[11px] font-extrabold tracking-[0.12em] text-coal">DEMO</span> : <span />}
       <span className="flex items-center gap-1"><CellSignalFull size={16} weight="fill" /><WifiHigh size={16} weight="bold" /><BatteryFull size={20} weight="fill" /></span>
     </div>
     {/* App header */}
@@ -68,6 +69,7 @@ export default function PhoneApp({ app }: { app: DemoApp }) {
     {/* Overlays */}
     <AnimatePresence>{app.browser && <BlockedSite key="browser" finding={app.browser} onClose={() => app.setBrowser(null)} />}</AnimatePresence>
     <AnimatePresence>{app.call && <CallScreen key="call" app={app} />}</AnimatePresence>
+    <AnimatePresence>{app.liveCall && <LiveCallScreen key="live" app={app} />}</AnimatePresence>
   </div>;
 }
 
