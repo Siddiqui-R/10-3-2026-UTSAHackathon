@@ -7,7 +7,10 @@
 /* Design tokens for the shadcn/ui components (Direction A: Meadow, refined). HSL triples. */
 @layer base {
   :root {
-    --background: 80 23% 96%;        /* meadow paper */
+    --background: 84 22% 95%;        /* meadow paper, faintly green */
+    --coal: 152 45% 8%;              /* the mine */
+    --coal-2: 151 36% 14%;
+    --lamp: 47 92% 60%;              /* canary lamp */
     --foreground: 154 25% 11%;       /* ink */
     --card: 0 0% 100%;
     --card-foreground: 154 25% 11%;
@@ -30,7 +33,7 @@
     --safe: 145 60% 30%;  --safe-soft: 137 40% 92%;
     --warn: 40 90% 32%;   --warn-soft: 46 100% 89%;
     --danger: 357 80% 39%; --danger-soft: 0 100% 97%;
-    --call: 214 27% 20%;  --call-deep: 213 31% 9%; --call-muted: 213 20% 70%;
+    --call: 151 36% 14%;  --call-deep: 152 45% 8%; --call-muted: 95 20% 74%;
   }
 }
 @layer base {
@@ -51,7 +54,7 @@
 
 * { box-sizing: border-box; }
 html { min-height: 100%; background: var(--paper); }
-body { margin: 0; color: var(--ink); font-family: 'DM Sans', sans-serif; }
+body { margin: 0; color: var(--ink); font-family: var(--font-body), 'Atkinson Hyperlegible', system-ui, sans-serif; }
 button { font: inherit; }
 
 .app-shell {
@@ -161,7 +164,7 @@ button { font: inherit; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }/* CallCanary: warm yellow identity and large, readable controls. */
 :root { --paper: #fbf8ed; --ink: #17261f; --muted-ink: #46544c; }
-body { font-family: 'DM Sans', Arial, sans-serif; }
+body { font-family: var(--font-body), 'Atkinson Hyperlegible', system-ui, sans-serif; }
 .app-shell { background-image: radial-gradient(#e8dfba 0.8px, transparent 0.8px); }
 .brand-mark { background: #f4cf47; color: #17261f; }
 .eyebrow { color: #625012; font-size: 16px; letter-spacing: .06em; }
@@ -494,3 +497,49 @@ body:has(.bottom-nav) { padding-bottom: calc(96px + env(safe-area-inset-bottom, 
 /* Canary (new Mascot component): next/image fills the box; mood animations pivot at the feet. */
 .canary img { z-index: 1; transform-origin: 50% 95%; }
 .canary .mascot-badge { width: 22%; height: 22%; min-width: 30px; min-height: 30px; font-size: clamp(16px, 4vw, 28px); }
+
+/* ── Atmosphere: "the canary in the coal mine" ─────────────────────────────────────────────
+   Dark coal band lit by a canary lamp, with faint sound rings spreading from the light (the canary listening).
+   Content sits on meadow paper with a fine pine dot grid. */
+html { background: hsl(var(--background)); }
+body {
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(hsl(var(--primary) / 0.075) 1px, transparent 1.3px);
+  background-size: 22px 22px;
+}
+.mine {
+  position: relative; isolation: isolate; color: #f2f6ee;
+  background:
+    radial-gradient(70% 85% at 50% -8%, hsl(var(--lamp) / 0.42), transparent 62%),
+    repeating-radial-gradient(circle at 50% -6%, transparent 0 38px, hsl(var(--lamp) / 0.075) 38px 40px),
+    linear-gradient(180deg, hsl(var(--coal-2)) 0%, hsl(var(--coal)) 100%);
+}
+/* The lamp breathes slowly; reduced motion keeps it still. */
+.mine::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(40% 55% at 50% -4%, hsl(var(--lamp) / 0.35), transparent 70%);
+  animation: lamp-breathe 5s ease-in-out infinite;
+}
+/* Call screen: the glow takes the verdict color. */
+.mine[data-glow] {
+  background:
+    radial-gradient(75% 65% at 50% 38%, var(--glow) , transparent 62%),
+    repeating-radial-gradient(circle at 50% 38%, transparent 0 34px, rgba(255, 255, 255, 0.045) 34px 36px),
+    linear-gradient(180deg, hsl(var(--coal-2)) 0%, hsl(var(--coal)) 100%);
+}
+.mine[data-glow]::before { background: radial-gradient(30% 30% at 50% 38%, var(--glow), transparent 70%); }
+/* Scam screens: red with alarm rings radiating from the canary. */
+.alarm-rings {
+  background:
+    radial-gradient(65% 45% at 50% 12%, rgba(255, 214, 102, 0.28), transparent 65%),
+    repeating-radial-gradient(circle at 50% 12%, transparent 0 30px, rgba(255, 255, 255, 0.06) 30px 32px),
+    linear-gradient(180deg, #c4161c 0%, #8f0f15 100%);
+}
+@keyframes lamp-breathe { 50% { opacity: 0.55; } }
+
+/* One orchestrated page load: sections rise in order (set --i per element). */
+.reveal { animation: reveal 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 90ms + 40ms); }
+@keyframes reveal { from { opacity: 0; transform: translateY(18px); } }
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .mine::before { animation: none; }
+}

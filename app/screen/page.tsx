@@ -23,7 +23,8 @@ import { formatUsNumber, normalizeUsNumber } from "@/lib/phoneNumber";
 import { DEMO_CONTACTS, SCREEN_DEMOS, type ScreenDemo } from "@/lib/screenDemos";
 import { speakWithDeviceVoice } from "@/lib/deviceVoice";
 import { addHistory } from "@/lib/history";
-import { cn } from "@/lib/utils";
+import { at, cn } from "@/lib/utils";
+import type { CSSProperties } from "react";
 
 type Stage = "idle" | "greeting" | "recording" | "checking" | "done";
 const MAX_REPLY_MS = 20_000;
@@ -32,6 +33,8 @@ const END_SILENCE_MS = 2_500;
 const SPEECH_LEVEL = 0.02;
 // Ring color carries the state before any words are read, like a phone's call screen.
 const ring = { idle: "bg-white/15", greeting: "bg-[#ffcc00]", recording: "bg-[#34c759]", checking: "bg-[#ffcc00]", done: "bg-white/15", scam: "bg-[#ff3b30]", careful: "bg-[#ffcc00]", safe: "bg-[#34c759]" } as const;
+// Atmosphere glow behind the canary for each state.
+const glowColor = { idle: "rgba(244,207,71,0.30)", greeting: "rgba(255,204,0,0.34)", recording: "rgba(52,199,89,0.32)", checking: "rgba(255,204,0,0.30)", done: "rgba(244,207,71,0.28)", scam: "rgba(255,59,48,0.46)", careful: "rgba(255,204,0,0.40)", safe: "rgba(52,199,89,0.38)" } as const;
 const verdictText = { scam: "text-[#ffb4ae]", careful: "text-[#ffe08a]", safe: "text-[#9ff0b8]" } as const;
 const layerLook: Record<ScreenLayer["status"], { Icon: typeof CheckCircle; className: string; word: string }> = {
   flagged: { Icon: XCircle, className: "text-danger", word: "Warning" },
@@ -184,27 +187,27 @@ export default function ScreenCaller() {
   const mood: MascotMood = stage === "greeting" ? "speaking" : stage === "recording" ? "alert" : stage === "checking" ? "concerned"
     : result?.verdict === "scam" ? "warning" : result?.verdict === "careful" ? "concerned" : stage === "done" ? "alert" : "sleeping";
   const ringColor = stage === "done" && result ? ring[result.verdict] : ring[stage];
+  const glow = stage === "done" && result ? glowColor[result.verdict] : glowColor[stage];
   const callerDigits = normalizeUsNumber(phone);
   const callerLine = callerDigits ? formatUsNumber(callerDigits) : "Unknown number";
   const analysis = { risk_score: 90, level: "scam" as const, scam_type: "other" as const, reasons: [result?.explanation || ""], red_flags: [] };
 
   return <main className="min-h-dvh">
     <TopBar active="screen" />
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
-      {stage === "idle" && <header className="grid gap-2 text-center">
-        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">A call from a number you don&apos;t know?</p>
-        <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">Let CallCanary answer first.</h1>
-        <p className="text-pretty text-xl text-muted-foreground">It asks who&apos;s calling and why, then tells you whether to talk to them.</p>
-      </header>}
+    {/* Direction C: the phone's own call screen, lit like the coal band; the glow takes the call's state. */}
+    <section aria-label="Call screen" data-glow="" style={{ "--glow": glow } as CSSProperties} className="mine overflow-hidden px-5 pb-12 pt-8 text-center text-white">
+     <div className="mx-auto max-w-3xl">
+      {stage === "idle" && <div className="mb-6 grid justify-items-center gap-3">
+        <p className="reveal text-sm font-bold uppercase tracking-[0.18em] text-lamp" style={at(0)}>A call from a number you don&apos;t know?</p>
+        <h1 className="reveal text-balance font-display text-[clamp(2.5rem,10vw,4.25rem)] font-extrabold leading-[0.95] tracking-[-0.025em] [font-stretch:86%]" style={at(1)}>Let CallCanary answer first.</h1>
+        <p className="reveal max-w-xl text-pretty text-xl leading-relaxed text-[#d6e2d0]" style={at(2)}>It asks who&apos;s calling and why, then tells you whether to talk to them.</p>
+      </div>}
 
-      {/* Direction C: the phone's own call screen. */}
-      <section aria-label="Call screen" className="relative overflow-hidden rounded-[32px] bg-gradient-to-b from-call to-call-deep px-5 pb-7 pt-6 text-center text-white shadow-xl">
         {demo && <p className="mx-auto mb-3 w-fit rounded-full bg-white/15 px-4 py-1.5 text-base font-bold">Sample call · {demo.label}</p>}
         <p className="text-base font-bold uppercase tracking-[0.1em] text-call-muted">{stage === "done" ? "Screened call" : stage === "idle" ? "CallCanary" : "Screening"} · {callerLine}</p>
         <AnimatePresence mode="wait">
           <motion.div key={stage === "done" ? `done-${result?.verdict}` : stage} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="mt-1 grid gap-1">
-            <h2 className="text-balance font-display text-3xl font-extrabold leading-tight sm:text-4xl" role="status">
-              {stage === "idle" && "Ready when a call comes in"}
+            <h2 className={cn("text-balance font-display text-3xl font-extrabold leading-tight sm:text-4xl", stage === "idle" && "sr-only")} role="status">{stage === "idle" && "Ready when a call comes in"}
               {stage === "greeting" && "Greeting the caller…"}
               {stage === "recording" && (heard ? "Listening to the caller…" : "Waiting for the caller…")}
               {stage === "checking" && "Checking what they said…"}
@@ -238,7 +241,9 @@ export default function ScreenCaller() {
           </>}
           {stage === "done" && result?.verdict === "safe" && <RoundButton label="Talk to them" variant="call-go" onClick={() => toast.success("Go ahead and talk", { description: "Still: never send money or share codes on a call you didn't expect." })}><Phone weight="fill" /></RoundButton>}
         </div>
-      </section>
+     </div>
+    </section>
+    <div className="relative mx-auto -mt-6 flex max-w-3xl flex-col gap-5 px-4 pb-6">
 
       {error && <Alert variant="destructive" role="alert"><Warning weight="bold" /><AlertDescription>{error}</AlertDescription></Alert>}
 
@@ -262,7 +267,7 @@ export default function ScreenCaller() {
       </>}
 
       {stage === "idle" && <>
-        <Card>
+        <Card className="reveal shadow-xl shadow-coal/10" style={at(4)}>
           <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2"><Hash size={28} weight="bold" aria-hidden="true" />Check the caller&apos;s number</CardTitle></CardHeader>
           <CardContent className="grid gap-3">
             <Label htmlFor="caller-number">Number on your phone screen (optional)</Label>

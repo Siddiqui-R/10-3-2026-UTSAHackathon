@@ -35,8 +35,8 @@ export default function WarningTakeover({ result, audioUrl, audioError, onRetry,
   const status = deviceVoice ? speaking ? "CallCanary is explaining with your device voice." : "Device voice backup selected."
     : audioError ? "CallCanary's voice is unavailable. Use the device voice below." : blocked ? "Tap Play below to hear CallCanary explain."
     : audioUrl ? speaking ? "CallCanary is explaining what it heard." : "Spoken warning ready." : "Preparing CallCanary's explanation…";
-  return <motion.main initial={{ backgroundColor: "#7a0d12" }} animate={{ backgroundColor: "#b3141b" }} transition={{ duration: 0.6 }}
-    className="min-h-dvh px-4 pb-12 pt-8 text-white" style={{ backgroundColor: "#b3141b" }}>
+  return <motion.main initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}
+    className="alarm-rings min-h-dvh px-4 pb-12 pt-8 text-white">
     <div className="mx-auto flex max-w-3xl flex-col items-center gap-5 text-center">
       <Mascot mood={speaking ? "speaking" : "warning"} size="lg" />
       <p className="rounded-full bg-white/15 px-4 py-1.5 text-base font-extrabold uppercase tracking-[0.14em]">CallCanary alert</p>

@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import { at, cn } from "@/lib/utils";
+import PageHero from "@/components/PageHero";
 import type { Analysis } from "@/lib/analysis";
 import { demoTranscripts } from "@/lib/demoTranscripts";
 import { scoreSignals, SIGNAL_THRESHOLD } from "@/lib/scamSignals";
@@ -128,12 +129,8 @@ export default function Home() {
     <TopBar active="call">
       <Badge variant={health?.ready ? "safe" : health ? "warn" : "outline"} className="hidden sm:inline-flex">{health === null ? "Checking…" : health.ready ? "Connected" : "Setup needed"}</Badge>
     </TopBar>
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
-      <header className="grid gap-2 text-center">
-        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">Your canary in the coal mine for phone scams</p>
-        <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">A little bird. A big warning.</h1>
-        <p className="text-pretty text-xl text-muted-foreground">Turn on protection, put your call on speaker, and I&apos;ll listen for trouble.</p>
-      </header>
+    <PageHero eyebrow="Your canary in the coal mine" title="A little bird. A big warning." subtitle="Turn on protection, put your call on speaker, and I'll listen for trouble." />
+    <div className="relative mx-auto -mt-14 flex max-w-3xl flex-col gap-5 px-4 pb-6">
 
       {health && !health.ready && <Collapsible asChild><Card className="border-warn bg-warn-soft">
         <CollapsibleTrigger className="flex min-h-16 w-full items-center gap-3 px-5 text-left text-xl font-extrabold"><Warning size={26} weight="fill" className="text-warn" aria-hidden="true" />Connect CallCanary to its voice and safety check</CollapsibleTrigger>
@@ -145,7 +142,7 @@ export default function Home() {
         </CardContent></CollapsibleContent>
       </Card></Collapsible>}
 
-      <Card className={cn("overflow-hidden transition-colors", active && "border-primary ring-4 ring-primary/15")} aria-label="Continuous call protection">
+      <Card className={cn("reveal overflow-hidden shadow-xl shadow-coal/10 transition-colors", active && "border-primary ring-4 ring-primary/15")} style={at(3)} aria-label="Continuous call protection">
         <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
           <div className="flex w-full items-center justify-between">
             <span className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.1em] text-muted-foreground">
@@ -172,7 +169,7 @@ export default function Home() {
           {!active && !demoBusy && <div className="grid w-full gap-4">
             <div className="flex items-start gap-4 rounded-xl bg-muted/60 p-4 text-left">
               <Switch id="consent" checked={consented} onCheckedChange={setConsented} className="mt-1" />
-              <Label htmlFor="consent" className="text-lg font-semibold leading-relaxed">Listen while this page is open. Browser speech recognition may send audio to its provider. Flagged clips go to ElevenLabs and words to Google.</Label>
+              <Label htmlFor="consent" className="text-lg font-normal leading-relaxed">Listen while this page is open. Browser speech recognition may send audio to its provider. Flagged clips go to ElevenLabs and words to Google.</Label>
             </div>
             <Button variant="canary" size="xl" disabled={!consented || starting} onClick={() => void start()}><Microphone weight="fill" />{starting ? "Connecting…" : "Start protection"}</Button>
           </div>}
@@ -203,7 +200,7 @@ export default function Home() {
           </CardContent>
         </Card></motion.div>}</AnimatePresence>
 
-      {!active && <Collapsible asChild><Card className="border-accent bg-[hsl(47_100%_96%)]">
+      {!active && <Collapsible asChild><Card className="reveal border-accent bg-[hsl(47_100%_96%)]" style={at(4)}>
         <CollapsibleTrigger className="group flex min-h-[72px] w-full items-center justify-between gap-3 rounded-xl px-6 text-left font-display text-2xl font-extrabold">
           <span className="flex items-center gap-3"><PlayCircle size={30} weight="fill" className="text-[hsl(40_90%_32%)]" aria-hidden="true" />Try a demo call</span>
           <CaretDown size={26} weight="bold" className="shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
@@ -214,7 +211,7 @@ export default function Home() {
             <Button key={id} variant="outline" size="lg" className="justify-start" disabled={demoBusy || starting} onClick={() => void demo(id)}><PlayCircle weight="fill" className="text-primary" />{label}</Button>)}
         </CardContent></CollapsibleContent>
       </Card></Collapsible>}
-      <p className="text-center text-base text-muted-foreground">CallCanary listens through your microphone, not directly to the phone line, so use speakerphone. Scams without these phrases can be missed: tap Check now whenever you&apos;re unsure.</p>
+      <p className="reveal text-center text-base text-muted-foreground" style={at(5)}>CallCanary listens through your microphone, not directly to the phone line, so use speakerphone. Scams without these phrases can be missed: tap Check now whenever you&apos;re unsure.</p>
     </div>
   </main>;
 }

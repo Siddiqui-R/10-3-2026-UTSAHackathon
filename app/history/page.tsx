@@ -12,7 +12,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { addHistory, clearHistory, historyEnabled, loadHistory, onHistoryChange, removeHistory, setHistoryEnabled, type HistoryEntry } from "@/lib/history";
-import { cn } from "@/lib/utils";
+import { at, cn } from "@/lib/utils";
+import PageHero from "@/components/PageHero";
 
 const look = {
   scam: { Icon: XCircle, word: "Scam", className: "text-danger", border: "border-danger/60" },
@@ -56,23 +57,19 @@ export default function RecentChecks() {
   }
   return <main className="min-h-dvh">
     <TopBar active="history" />
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
-      <header className="grid gap-2 text-center">
-        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">Your recent checks</p>
-        <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">What CallCanary checked</h1>
-        <p className="text-pretty text-xl text-muted-foreground">Saved only on this device. Nothing here is uploaded or shared.</p>
-      </header>
+    <PageHero eyebrow="Your recent checks" title="What CallCanary checked" subtitle="Saved only on this device. Nothing here is uploaded or shared." />
+    <div className="relative mx-auto -mt-14 flex max-w-3xl flex-col gap-5 px-4 pb-6">
 
-      {entries !== null && scams > 0 && <motion.p initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-        className="rounded-2xl border-2 border-accent bg-accent/30 p-4 text-center text-2xl">CallCanary caught <strong>{scams} {scams === 1 ? "scam" : "scams"}</strong> for you.</motion.p>}
+      {entries !== null && entries.length > 0 && <p
+        style={at(3)} className="reveal rounded-2xl border-2 border-lamp bg-coal p-4 text-center text-2xl text-[#f2f6ee] shadow-xl shadow-coal/20">{scams > 0 ? <>CallCanary caught <strong className="text-lamp">{scams} {scams === 1 ? "scam" : "scams"}</strong> for you.</> : <><strong className="text-lamp">{entries.length}</strong> {entries.length === 1 ? "check" : "checks"} saved on this device.</>}</p>}
 
-      {entries !== null && entries.length === 0 && <Card><CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+      {entries !== null && entries.length === 0 && <Card className="reveal shadow-xl shadow-coal/10" style={at(3)}><CardContent className="flex flex-col items-center gap-4 p-6 text-center">
         <Mascot mood="sleeping" size="md" />
         <p className="text-xl">{enabled ? "Nothing yet. Calls you screen, numbers and emails you check will show up here." : "History is turned off, so nothing is being saved."}</p>
         <div className="flex flex-wrap justify-center gap-3"><Button asChild><Link href="/screen">Screen a caller</Link></Button><Button asChild variant="secondary"><Link href="/email">Check an email</Link></Button></div>
       </CardContent></Card>}
 
-      {groups.map(group => <section key={group.label} aria-label={group.label} className="grid gap-3">
+      {groups.map((group, g) => <section key={group.label} aria-label={group.label} className="reveal grid gap-3" style={at(4 + g)}>
         <h2 className="font-display text-2xl font-extrabold">{group.label}</h2>
         <ul className="grid gap-3">
           <AnimatePresence initial={false}>{group.items.map(entry => { const l = look[entry.verdict];

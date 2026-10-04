@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 const banner = {
   safe: { title: "This email looks safe", Icon: CheckCircle, className: "bg-safe-soft border-safe text-[hsl(145_60%_18%)]" },
   suspicious: { title: "Be careful", Icon: Warning, className: "bg-warn-soft border-warn text-[hsl(40_90%_18%)]" },
-  phishing: { title: "PHISHING EMAIL", Icon: XCircle, className: "bg-danger border-[hsl(357_80%_26%)] text-white" },
+  phishing: { title: "PHISHING EMAIL", Icon: XCircle, className: "alarm-rings border-[hsl(357_80%_26%)] text-white" },
 } as const;
 const linkLook = {
   safe: { Icon: CheckCircle, word: "Looks okay", badge: "safe", border: "border-safe/50", bg: "bg-safe-soft/60", text: "text-safe" },

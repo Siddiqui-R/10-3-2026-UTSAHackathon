@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { at, cn } from "@/lib/utils";
+import PageHero from "@/components/PageHero";
 import TopBar from "@/components/TopBar";
 import Mascot from "@/components/Mascot";
 import EmailResultView from "@/components/EmailResultView";
@@ -50,22 +51,18 @@ export default function EmailCheck() {
   const noun = mode === "email" ? "email" : "link";
   return <main className="min-h-dvh">
     <TopBar active="email" />
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
+    {!result && <PageHero eyebrow="Got a strange email or text?" title="Check it before you click." subtitle="Paste it here. CallCanary checks where every link really goes, looks for spelling mistakes, and spots fake senders." />}
+    <div className={cn("relative mx-auto flex max-w-3xl flex-col gap-5 px-4", result ? "py-6" : "-mt-14 pb-6")}>
       {result ? <EmailResultView result={result} onReset={reset} /> : <>
-        <header className="grid gap-2 text-center">
-          <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-primary">Got a strange email or text?</p>
-          <h1 className="text-balance font-display text-4xl font-extrabold leading-tight sm:text-5xl">Check it before you click.</h1>
-          <p className="text-pretty text-xl text-muted-foreground">Paste it here. CallCanary checks where every link really goes, looks for spelling mistakes, and spots fake senders.</p>
-        </header>
-        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5" role="radiogroup" aria-label="What do you want to check?">
+        <div style={at(3)} className="reveal grid grid-cols-2 gap-2 rounded-2xl border-2 bg-card p-1.5 shadow-xl shadow-coal/10" role="radiogroup" aria-label="What do you want to check?">
           {([["email", "A whole email", EnvelopeSimple], ["link", "Just a link", LinkSimple]] as const).map(([id, label, Icon]) =>
             <button key={id} role="radio" aria-checked={mode === id} onClick={() => setMode(id)}
               className={cn("relative flex min-h-16 items-center justify-center gap-2 rounded-xl text-xl font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring", mode === id ? "text-[hsl(152_71%_15%)]" : "text-muted-foreground")}>
-              {mode === id && <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-xl bg-card shadow" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
+              {mode === id && <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-xl bg-secondary shadow" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
               <span className="relative flex items-center gap-2"><Icon size={26} weight={mode === id ? "fill" : "regular"} aria-hidden="true" />{label}</span>
             </button>)}
         </div>
-        <Card><CardContent className="p-5">
+        <Card className="reveal" style={at(4)}><CardContent className="p-5">
           <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void check(); }}>
             <Label htmlFor="email-input" className="font-display text-2xl font-extrabold">{mode === "email" ? "Paste a suspicious email here" : "Paste a suspicious link here"}</Label>
             {mode === "email"
