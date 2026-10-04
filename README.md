@@ -70,3 +70,9 @@ Push to **Siddiqui-R/10-3-2026-UTSAHackathon**, import it in Vercel with the Nex
 Set `GEMINI_MODEL` (for example `gemini-3.6-flash`) in Vercel to pin a model that answers quickly. Without it, the route discovers Flash models, tries the last one that worked first, and benches overloaded (503), rate-limited (429) or hanging models for two minutes.
 
 Optional Tiger Data logging/dashboard is not implemented. DATABASE_URL is reserved for that stretch feature. No transcripts or recordings are stored in a database.
+
+## Connected application demo
+
+Open `/demo` (the **App demo** tab) for a repeatable Gmail and phone walkthrough. Connect the sample Gmail inbox, open a flagged message, hear its explanation, and move it to demo spam. Simulate an incoming IRS call, answer it, watch scripted captions and weighted phrases build, then hear the mascot warning and demonstrate hanging up or blocking. **Call Alex** demonstrates an outgoing call screen.
+
+Gmail, telephone connections, messages, verdicts, spam, and blocking on this screen are client-side simulations. It requests no Gmail permissions, microphone access, or phone access and sends no messages or calls. Only **Hear why / Hear the mascot explain** uses the existing ElevenLabs speech route (with device voice fallback). Reset restores the original sample state. The real microphone and paste-an-email tools remain separate.
