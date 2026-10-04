@@ -21,6 +21,10 @@ export type ListeningDependencies = {
   getMedia: () => Promise<MediaStream>;
   makeRecorder: (stream: MediaStream) => MediaRecorder;
   makeRecognition?: () => Recognition;
+  /** Microphone loudness meter (0–1), used to notice when speech recognition hears nothing while people talk. */
+  makeLevelMeter?: (stream: MediaStream) => { level(): number; close(): void };
+  /** Seconds of clear speech with no recognized words before falling back to clip checks. */
+  deafAfterSeconds?: number;
   transcribe: (audio: Blob, signal: AbortSignal) => Promise<string>;
   analyze: (words: string, signal: AbortSignal) => Promise<Analysis>;
   update: (state: ListeningState) => void;
@@ -33,6 +37,7 @@ const MAX_WORD_ENTRIES = 200;
 const MAX_WORD_CHARS = 4_000;
 const RESTART_WINDOW_MS = 30_000;
 const MAX_QUIET_RESTARTS = 6;
+const SPEECH_LEVEL = 0.02;
 
 // The current segment and one previous segment are independent, decodable files.
 // Audio and text are bounded to ~40 seconds; nothing is stored once a check finishes.
@@ -58,6 +63,9 @@ export class ListeningSession {
   private holdUntil = 0;
   private failures = 0;
   private quietRestarts: number[] = [];
+  private meter?: { level(): number; close(): void };
+  // Seconds of audible sound since speech recognition last produced any words.
+  private unheardSeconds = 0;
   private warnings = new Map<"offline" | "muted" | "provider" | "speech", string>();
   constructor(private readonly deps: ListeningDependencies) {}
   get status() { return this.state.status; }
@@ -79,6 +87,8 @@ export class ListeningSession {
     }
     this.stream?.getTracks().forEach(track => { track.onended = null; track.onmute = null; track.onunmute = null; track.stop(); });
     this.stream = undefined; this.recorder = undefined; this.previous = undefined; this.finalWords = []; this.interim = { text: "", at: 0 };
+    try { this.meter?.close(); } catch { /* already closed */ }
+    this.meter = undefined; this.unheardSeconds = 0;
     this.cutPromise = undefined; this.segment = () => new Blob(); this.failures = 0; this.quietRestarts = []; this.warnings.clear();
     this.publish({ ...initialListeningState, message });
   }
@@ -106,6 +116,7 @@ export class ListeningSession {
       });
       const mode = this.deps.makeRecognition ? "keywords" : "periodic";
       this.publish({ status: "listening", mode, message: mode === "keywords" ? "Listening for warning phrases" : "Checking short audio clips every 20 seconds" });
+      if (mode === "keywords" && this.deps.makeLevelMeter) { try { this.meter = this.deps.makeLevelMeter(stream); } catch { /* no meter: rely on recognition */ } }
       this.record(); if (mode === "keywords") this.listen();
       this.rotation = setInterval(() => this.rotate(generation), ROTATION_MS);
       this.clock = setInterval(() => this.tick(), 1000);
@@ -131,6 +142,16 @@ export class ListeningSession {
     this.finalWords = this.finalWords.filter(w => now - w.at < EVIDENCE_WINDOW_MS);
     this.publish({ seconds: Math.floor((now - this.started) / 1000) });
     if (!this.checking) this.evaluate(this.currentWords(), true);
+    // Deaf recognition: some browsers start speech recognition but never return words or errors. If the mic clearly
+    // hears sound for a while and recognition stays silent, check audio clips instead of pretending to listen.
+    if (this.meter && this.state.mode === "keywords" && !this.checking) {
+      let level = 0; try { level = this.meter.level(); } catch { /* meter unavailable */ }
+      if (level >= SPEECH_LEVEL) this.unheardSeconds++;
+      if (this.unheardSeconds >= (this.deps.deafAfterSeconds ?? 12)) {
+        this.toPeriodic("Phrase listening isn't picking up speech. Checking 20-second clips with ElevenLabs instead.");
+        void this.checkNow(false);
+      }
+    }
   }
   private currentWords() {
     const recentInterim = Date.now() - this.interim.at < 8000 ? " " + this.interim.text : "";
@@ -182,7 +203,9 @@ export class ListeningSession {
     const finals = new Set<number>();
     recognition.onresult = event => {
       if (!this.active || this.checking || generation !== this.generation) return;
-      heard = true; this.quietRestarts = [];
+      // Only actual words count as hearing; some browsers fire empty result events.
+      const words = Array.from(event.results).some(result => result[0]?.transcript?.trim());
+      if (words) { heard = true; this.quietRestarts = []; this.unheardSeconds = 0; }
       let interim = "";
       for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];

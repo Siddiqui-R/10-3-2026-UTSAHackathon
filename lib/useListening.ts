@@ -30,6 +30,16 @@ export function useListening(onVerdict: (verdict: Analysis) => void) {
         return new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: 32000 });
       },
       makeRecognition: SpeechRecognition ? () => new SpeechRecognition() : undefined,
+      makeLevelMeter: stream => {
+        const context = new AudioContext();
+        const analyser = context.createAnalyser(); analyser.fftSize = 1024;
+        context.createMediaStreamSource(stream).connect(analyser);
+        const samples = new Float32Array(analyser.fftSize);
+        return {
+          level: () => { analyser.getFloatTimeDomainData(samples); return Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length); },
+          close: () => { void context.close(); },
+        };
+      },
       transcribe: async (audio, signal) => {
         const form = new FormData(); form.append("audio", audio, audio.type.includes("mp4") ? "recent-call.mp4" : "recent-call.webm");
         const response = await fetch("/api/transcribe", { method: "POST", body: form, signal });

@@ -99,6 +99,31 @@ module.exports = async function testListening() {
     for (let i = 0; i < 6; i++) { const current = looping.speech; current.onend(); await delay(300 + 300 * (i + 1) + 20); }
     assert.equal(looping.state.mode, 'periodic'); assert.match(looping.state.warning, /20-second clips/); assert.equal(looping.state.status, 'listening');
   } finally { looping.session.stop(); }
+  // Deaf recognition: sound keeps coming in but no words are recognized, so it switches to clip checks and checks now.
+  let meterClosed = false;
+  const deaf = fixture({ deafAfterSeconds: 2, makeLevelMeter: () => ({ level: () => 0.1, close: () => { meterClosed = true; } }) });
+  try {
+    await deaf.session.start(); await delay(2600);
+    assert.equal(deaf.state.mode, 'periodic'); assert.match(deaf.state.warning, /20-second clips/); assert.ok(deaf.transcriptions >= 1);
+    deaf.session.stop(); assert.equal(meterClosed, true);
+  } finally { deaf.session.stop(); }
+  // Empty result events (no words) don't count as hearing.
+  const empty = fixture({ deafAfterSeconds: 2, makeLevelMeter: () => ({ level: () => 0.1, close() {} }) });
+  try {
+    await empty.session.start();
+    for (let i = 0; i < 3; i++) { await delay(900); empty.speech?.onresult?.({ results: [{ isFinal: false, 0: { transcript: '  ' } }] }); }
+    assert.equal(empty.state.mode, 'periodic');
+  } finally { empty.session.stop(); }
+  // Silence is not deafness, and recognized words reset the count.
+  const quiet = fixture({ deafAfterSeconds: 2, makeLevelMeter: () => ({ level: () => 0, close() {} }) });
+  try { await quiet.session.start(); await delay(2600); assert.equal(quiet.state.mode, 'keywords'); assert.equal(quiet.transcriptions, 0); }
+  finally { quiet.session.stop(); }
+  const hearing = fixture({ deafAfterSeconds: 2, makeLevelMeter: () => ({ level: () => 0.1, close() {} }) });
+  try {
+    await hearing.session.start();
+    for (let i = 0; i < 3; i++) { await delay(900); hearing.speech.onresult({ results: [{ isFinal: false, 0: { transcript: 'see you at dinner' } }] }); }
+    assert.equal(hearing.state.mode, 'keywords');
+  } finally { hearing.session.stop(); }
   // Device mute and offline states are shown but do not pretend protection stopped.
   const muted = fixture();
   try {
