@@ -37,6 +37,12 @@ The ElevenLabs key needs Text to Speech, Speech to Text, Voices read and Models 
 - While listening, the page asks the browser for a screen wake lock and shows whether it was granted.
 - Listening continues until stopped or a scam intervention. Browser suspension, page closure, locked devices and browser permission policies can interrupt it. This web app cannot guarantee system-wide background monitoring or directly intercept telephone audio.
 
+## Product demo for videos (/demo)
+
+A phone running the CallCanary app, built for recording. **Play full tour** runs seven scenes in about two minutes: protected home, Gmail scan (phishing moved to Scam), a scam website blocked (rnicrosoft.com shown letter by letter against microsoft.com), a scam text, a reported robocall blocked before it rings, the AI call screener (spoken greeting, caller audio, live checks, spoken goodbye) and the blocked list. Each scene can also be played on its own. Captions can be shown under the phone; press **H** to hide the controls and **C** to toggle captions. The **Web** tab checks any address you type.
+
+The verdicts are real: the email analyzer, link checker, FTC number list and AI call screener all run on the sample data. Reading Gmail, blocking numbers and blocking websites on a phone would need a native app, so the demo shows those without changing anything, and the phone's status bar always says DEMO. `tests/demo.cjs` keeps the demo's promises true (for example, that rnicrosoft.com is flagged as imitating Microsoft and microsoft.com is allowed).
+
 ## Screen a caller (/screen)
 
 For calls from unknown numbers. Answer on speaker and tap **Answer with CallCanary**. The canary's voice asks the caller for their name and the reason for the call. Recording starts only after the greeting, so CallCanary never records itself. It stops when the caller goes quiet, after 20 seconds, or if they never speak. Then layered checks run (`lib/screening.ts`):

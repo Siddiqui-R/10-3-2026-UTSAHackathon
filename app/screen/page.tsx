@@ -21,7 +21,7 @@ import { sanitizeContacts, type TrustedContact } from "@/lib/contacts";
 import { loadContacts, saveContacts } from "@/lib/contactStore";
 import { formatUsNumber, normalizeUsNumber } from "@/lib/phoneNumber";
 import { DEMO_CONTACTS, SCREEN_DEMOS, type ScreenDemo } from "@/lib/screenDemos";
-import { speakWithDeviceVoice } from "@/lib/deviceVoice";
+import { fetchVoice, playAudio } from "@/lib/audioPlayback";
 import { addHistory } from "@/lib/history";
 import { at, cn } from "@/lib/utils";
 import type { CSSProperties } from "react";
@@ -44,22 +44,6 @@ const layerLook: Record<ScreenLayer["status"], { Icon: typeof CheckCircle; class
   unavailable: { Icon: Prohibit, className: "text-muted-foreground", word: "Unavailable" },
   pending: { Icon: CaretDown, className: "text-muted-foreground animate-pulse", word: "Checking" },
 };
-
-async function fetchVoice(script: "greeting" | "goodbye") {
-  const response = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script }) });
-  if (!response.ok) throw new Error("voice unavailable");
-  return URL.createObjectURL(await response.blob());
-}
-/** Play a recording; falls back to the device voice reading `text`. Resolves when it finishes. */
-function playAudio(url: string | undefined, text: string, onPlayer?: (audio: HTMLAudioElement) => void) {
-  return new Promise<void>(resolve => {
-    const viaDevice = () => { if (!speakWithDeviceVoice(text, { onStart: () => {}, onEnd: () => resolve(), onError: () => resolve() })) resolve(); };
-    if (!url) { viaDevice(); return; }
-    const audio = new Audio(url); onPlayer?.(audio);
-    audio.onended = () => resolve(); audio.onerror = viaDevice; audio.onpause = () => { if (!audio.ended) resolve(); };
-    audio.play().catch(viaDevice);
-  });
-}
 
 export default function ScreenCaller() {
   const [stage, setStage] = useState<Stage>("idle");

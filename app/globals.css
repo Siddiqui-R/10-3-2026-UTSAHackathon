@@ -507,6 +507,7 @@ body {
   background-image: radial-gradient(hsl(var(--primary) / 0.075) 1px, transparent 1.3px);
   background-size: 22px 22px;
 }
+@layer components {
 .mine {
   position: relative; isolation: isolate; color: #f2f6ee;
   background:
@@ -534,6 +535,7 @@ body {
     radial-gradient(65% 45% at 50% 12%, rgba(255, 214, 102, 0.28), transparent 65%),
     repeating-radial-gradient(circle at 50% 12%, transparent 0 30px, rgba(255, 255, 255, 0.06) 30px 32px),
     linear-gradient(180deg, #c4161c 0%, #8f0f15 100%);
+}
 }
 @keyframes lamp-breathe { 50% { opacity: 0.55; } }
 

@@ -210,3 +210,5 @@ export function checkSender(text: string): SenderFacts | null {
 export function linkReport(text: string) {
   return { links: extractLinks(text).map(analyzeLink), sender: checkSender(text) };
 }
+/** The main official domain for a brand, and its display name (for "looks like" comparisons). */
+export function brandInfo(brand: Brand) { return { domain: OFFICIAL[brand][0], name: BRAND_LABELS[brand].replace(/^the /, "") }; }
