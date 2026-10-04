@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.CallCanary" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:statusBarColor">@color/coal</item>
+        <item name="android:navigationBarColor">@color/coal</item>
+    </style>
+    <color name="coal">#FF0C1F16</color>
+    <color name="paper">#FFF3F5EE</color>
+    <color name="lamp">#FFF4CF47</color>
+</resources>

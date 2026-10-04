@@ -37,6 +37,10 @@ The ElevenLabs key needs Text to Speech, Speech to Text, Voices read and Models 
 - While listening, the page asks the browser for a screen wake lock and shows whether it was granted.
 - Listening continues until stopped or a scam intervention. Browser suspension, page closure, locked devices and browser permission policies can interrupt it. This web app cannot guarantee system-wide background monitoring or directly intercept telephone audio.
 
+## Android app (android/)
+
+A native Android app that screens and blocks calls on the phone itself: it becomes Android's caller ID & spam app, checks every incoming call from a non-contact against your block list and the bundled FTC complaint list (offline), rejects or silences matches before the phone rings, and notifies you why. Share any link, text or email to it for the same checks as /email. See [android/README.md](android/README.md) to build and install.
+
 ## Product demo for videos (/demo)
 
 A phone running the CallCanary app, built for recording. **Play full tour** runs eight scenes in about two and a half minutes: protected home, Gmail scan (phishing moved to Scam), a scam website blocked (rnicrosoft.com shown letter by letter against microsoft.com), a scam text, a reported robocall blocked before it rings, live call protection (you answer a fake "bank fraud department" call on the phone's own call screen; CallCanary listens with live captions and phrase scores, the AI confirms the scam, the canary explains out loud, and "Hang up & block" ends the call and blocks the number), the AI call screener (spoken greeting, caller audio, live checks, spoken goodbye) and the blocked list. Each scene can also be played on its own. Captions can be shown under the phone, and the DEMO label on the phone can be hidden; press **H** to hide the controls and **C** to toggle captions. The **Web** tab checks any address you type.

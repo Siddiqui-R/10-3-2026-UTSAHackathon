@@ -15,3 +15,9 @@ pnpm-debug.log*
 
 .vercel
 .env*
+# Android build output and machine-specific settings
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
